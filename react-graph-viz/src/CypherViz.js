@@ -13,7 +13,7 @@ class CypherViz extends React.Component {
         MATCH (n:Character)-[:INTERACTS1]->(m:Character) 
         RETURN n.name as source, m.name as target
         `,
-        data : {nodes:[{name:"Joe"},{name:"Jane"}],links:[{source:"Joe",target:"Jane"}]} }
+        data : {nodes:[{name:"Masataka Hosoo"},{name:"Mae Englegeer"}],links:[{source:"Masataka Hosoo",target:"Mae Englegeer"}]} }
     }
   
     handleChange = (event) => {
