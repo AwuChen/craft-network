@@ -97,7 +97,7 @@ class CypherViz extends React.Component {
           {"name":"Sander Wassick","color":"Blue"},
           {"name":"Rintaro Akazawa","color":"Green"},
           {"name":"Mitasho-san","color":"Green"},
-          {"name":"Kiyoko","color":"gold""craft":"manager","background":"The Terminal"},
+          {"name":"Kiyoko","color":"gold","craft":"manager","background":"The Terminal"},
           {"name":"Danielle Demetriou","color":"Gray","craft":"writer","background":"British"},
           {"name":"Vittoria Magrelli","color":"Gray","craft":"researcher","background":"University of Bozen-Bolzano"},
           {"name":"Daniel Hjorth","color":"Gray","craft":"researcher","background":"Copenhagen Business School"},
