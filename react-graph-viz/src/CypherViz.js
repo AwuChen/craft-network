@@ -102,6 +102,7 @@ class CypherViz extends React.Component {
           {"name":"Soshin Kimura","color":"Green","craft":"tea master","background":"Hoshinkai"},
           {"name":"Adam Clauge","color":"Gray","craft":"researcher","background":"University of Oxford"},
           {"name":"Hee-Chan Sang","color":"Gray","craft":"researcher","background":"Sasin School of Management"},
+          ],
         links:[
           {source:"Dan Wadwhani",target:"Eugene Choi"},
           {source:"Eugene Choi",target:"Masataka Hosoo"},
