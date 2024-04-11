@@ -97,14 +97,24 @@ class CypherViz extends React.Component {
           {"name":"Sander Wassick","color":"Blue"},
           {"name":"Rintaro Akazawa","color":"Green"},
           {"name":"Mitasho-san","color":"Green"},
+          {"name":"Kiyoko","color":"gold""craft":"manager","background":"The Terminal"},
           {"name":"Danielle Demetriou","color":"Gray","craft":"writer","background":"British"},
+          {"name":"Vittoria Magrelli","color":"Gray","craft":"researcher","background":"University of Bozen-Bolzano"},
+          {"name":"Daniel Hjorth","color":"Gray","craft":"researcher","background":"Copenhagen Business School"},
+          {"name":"Damian Doherty","color":"Gray","craft":"researcher","background":"University of Liverpool"},
           {"name":"Yamauchi Yutaka","color":"Gray","craft":"professor","background":"Kyoto University"},
           {"name":"Soshin Kimura","color":"Green","craft":"tea master","background":"Hoshinkai"},
           {"name":"Adam Clauge","color":"Gray","craft":"researcher","background":"University of Oxford"},
           {"name":"Hee-Chan Sang","color":"Gray","craft":"researcher","background":"Sasin School of Management"},
+          {"name":"Fabrizio Panozzo","color":"Gray","craft":"researcher","background":"Sasin School of Management"},
           ],
         links:[
           {source:"Dan Wadwhani",target:"Eugene Choi"},
+          {source:"Dan Wadwhani",target:"Marta Gasparin"},
+          {source:"Marta Gasparin",target:"Adam Clauge"},
+          {source:"Marta Gasparin",target:"Yamauchi Yutaka"},
+          {source:"Marta Gasparin",target:"Vittoria Magrelli"},
+          {source:"Yamauchi Yutaka",target:"Soshin Kimura"},
           {source:"Eugene Choi",target:"Masataka Hosoo"},
           {source:"Masataka Hosoo",target:"Taeko Hosoo"},
           {source:"Masataka Hosoo",target:"Yoshida"},
@@ -149,6 +159,7 @@ class CypherViz extends React.Component {
           {source:"Vicki Dobbs Beck",target:"Matthew Drinkwater"},
           {source:"Vicki Dobbs Beck",target:"Robin Caudwell"},
           {source:"Vicki Dobbs Beck",target:"Kate Reardon"},
+          {source:"Kiyoko",target:"Ko Kado"},
           ]} }
     }
   
