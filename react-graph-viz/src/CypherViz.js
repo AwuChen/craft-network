@@ -121,8 +121,8 @@ class CypherViz extends React.Component {
           {"name":"Eleanor Westney","color":"Gray","craft":"researcher","background":"MIT Sloan"},
           {"name":"Kiyohiko Ho","color":"Gray","craft":"researcher","background":"Shidler College of Business"},
           {"name":"Ito ","color":"Gray","craft":"researcher","background":"Kyoto University","note":"prev bartender"},
-          {"name":"Yusuke Nananishi ","color":"Purple","craft":"director","background":"Kyoto Graphie","note":"friendly approachable"},
-          {"name":"Mama-san ","color":"Purple","craft":"networker","background":"8000 generation","note":"small cozy space"},
+          {"name":"Yusuke Nananishi","color":"Purple","craft":"director","background":"Kyoto Graphie","note":"friendly approachable"},
+          {"name":"Mama-san","color":"Purple","craft":"networker","background":"8000 generation","note":"small cozy space"},
 
           ],
         links:[
