@@ -121,6 +121,9 @@ class CypherViz extends React.Component {
           {"name":"Eleanor Westney","color":"Gray","craft":"researcher","background":"MIT Sloan"},
           {"name":"Kiyohiko Ho","color":"Gray","craft":"researcher","background":"Shidler College of Business"},
           {"name":"Ito ","color":"Gray","craft":"researcher","background":"Kyoto University","note":"prev bartender"},
+          {"name":"Yusuke Nananishi ","color":"Purple","craft":"director","background":"Kyoto Graphie","note":"friendly approachable"},
+          {"name":"Mama-san ","color":"Purple","craft":"networker","background":"8000 generation","note":"small cozy space"},
+
           ],
         links:[
           {source:"Dan Wadwhani",target:"Eugene Choi"},
@@ -128,8 +131,9 @@ class CypherViz extends React.Component {
           {source:"Masataka Hosoo",target:"Taeko Hosoo"},
           {source:"Masataka Hosoo",target:"Kondo"},
           {source:"Masataka Hosoo",target:"Yui Kondo"},
+          {source:"Masataka Hosoo",target:"Kondo"},
           {source:"Yui Kondo",target:"Nina Fradet"},
-
+          {source:"Yui Kondo",target:"Nina Fradet"},
           {source:"Masataka Hosoo",target:"Yoshida"},
           {source:"Masataka Hosoo",target:"Mae Englegeer"},
           {source:"Masataka Hosoo",target:"Mae Englegeer"},
@@ -188,6 +192,9 @@ class CypherViz extends React.Component {
           {source:"Yamauchi Yutaka",target:"Jingjing Weng"},
           {source:"Jingjing Weng",target:"Grace Yi"},
           {source:"Jingjing Weng",target:"Chichie Huang"},
+          {source:"Yui Kondo",target:"Yusuke Nananishi"},
+          {source:"Takaaki Murase",target:"Mama-san"},
+
           ]} }
     }
   
