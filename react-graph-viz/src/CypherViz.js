@@ -123,6 +123,7 @@ class CypherViz extends React.Component {
           {"name":"Ito ","color":"Gray","craft":"researcher","background":"Kyoto University","note":"prev bartender"},
           {"name":"Yusuke Nananishi","color":"Purple","craft":"director","background":"Kyoto Graphie","note":"friendly approachable"},
           {"name":"Mama-san","color":"Purple","craft":"networker","background":"8000 generation","note":"small cozy space"},
+          {"name":"Yuima Nakazato","color":"Purple","craft":"fashion designer","background":"Pottery","note":"Collanorated with Spiber, met through Shiho"},
 
           ],
         links:[
@@ -194,6 +195,8 @@ class CypherViz extends React.Component {
           {source:"Jingjing Weng",target:"Chichie Huang"},
           {source:"Yui Kondo",target:"Yusuke Nananishi"},
           {source:"Takaaki Murase",target:"Mama-san"},
+          {source:"Shiho Fukuhara",target:"Yuima Nakazato"},
+          {source:"Koichi Saito",target:"Yuima Nakazato"},
 
           ]} }
     }
