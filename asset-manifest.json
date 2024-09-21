@@ -1,22 +1,22 @@
 {
   "files": {
-    "main.css": "/awuchen.github.io/static/css/main.523f09c5.chunk.css",
-    "main.js": "/awuchen.github.io/static/js/main.a1714ba4.chunk.js",
-    "main.js.map": "/awuchen.github.io/static/js/main.a1714ba4.chunk.js.map",
-    "runtime-main.js": "/awuchen.github.io/static/js/runtime-main.b2a49641.js",
-    "runtime-main.js.map": "/awuchen.github.io/static/js/runtime-main.b2a49641.js.map",
-    "static/js/2.0b35be4c.chunk.js": "/awuchen.github.io/static/js/2.0b35be4c.chunk.js",
-    "static/js/2.0b35be4c.chunk.js.map": "/awuchen.github.io/static/js/2.0b35be4c.chunk.js.map",
-    "index.html": "/awuchen.github.io/index.html",
-    "precache-manifest.7910a1d5b29fe3fcf8be337c7c1ff2d9.js": "/awuchen.github.io/precache-manifest.7910a1d5b29fe3fcf8be337c7c1ff2d9.js",
-    "service-worker.js": "/awuchen.github.io/service-worker.js",
-    "static/css/main.523f09c5.chunk.css.map": "/awuchen.github.io/static/css/main.523f09c5.chunk.css.map",
-    "static/js/2.0b35be4c.chunk.js.LICENSE.txt": "/awuchen.github.io/static/js/2.0b35be4c.chunk.js.LICENSE.txt"
+    "main.css": "/craft-network/static/css/main.523f09c5.chunk.css",
+    "main.js": "/craft-network/static/js/main.7f7b4e78.chunk.js",
+    "main.js.map": "/craft-network/static/js/main.7f7b4e78.chunk.js.map",
+    "runtime-main.js": "/craft-network/static/js/runtime-main.ad10f8df.js",
+    "runtime-main.js.map": "/craft-network/static/js/runtime-main.ad10f8df.js.map",
+    "static/js/2.0b35be4c.chunk.js": "/craft-network/static/js/2.0b35be4c.chunk.js",
+    "static/js/2.0b35be4c.chunk.js.map": "/craft-network/static/js/2.0b35be4c.chunk.js.map",
+    "index.html": "/craft-network/index.html",
+    "precache-manifest.4307792d0bcf6817a460e4e643124cb9.js": "/craft-network/precache-manifest.4307792d0bcf6817a460e4e643124cb9.js",
+    "service-worker.js": "/craft-network/service-worker.js",
+    "static/css/main.523f09c5.chunk.css.map": "/craft-network/static/css/main.523f09c5.chunk.css.map",
+    "static/js/2.0b35be4c.chunk.js.LICENSE.txt": "/craft-network/static/js/2.0b35be4c.chunk.js.LICENSE.txt"
   },
   "entrypoints": [
-    "static/js/runtime-main.b2a49641.js",
+    "static/js/runtime-main.ad10f8df.js",
     "static/js/2.0b35be4c.chunk.js",
     "static/css/main.523f09c5.chunk.css",
-    "static/js/main.a1714ba4.chunk.js"
+    "static/js/main.7f7b4e78.chunk.js"
   ]
 }
