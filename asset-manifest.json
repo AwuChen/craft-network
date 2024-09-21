@@ -1,22 +1,22 @@
 {
   "files": {
-    "main.css": "/awuchen.github.io/awuchen.github.io/awuchen.github.io/static/css/main.523f09c5.chunk.css",
-    "main.js": "/awuchen.github.io/awuchen.github.io/awuchen.github.io/static/js/main.5b85a0a9.chunk.js",
-    "main.js.map": "/awuchen.github.io/awuchen.github.io/awuchen.github.io/static/js/main.5b85a0a9.chunk.js.map",
-    "runtime-main.js": "/awuchen.github.io/awuchen.github.io/awuchen.github.io/static/js/runtime-main.1a6a4b17.js",
-    "runtime-main.js.map": "/awuchen.github.io/awuchen.github.io/awuchen.github.io/static/js/runtime-main.1a6a4b17.js.map",
-    "static/js/2.0b35be4c.chunk.js": "/awuchen.github.io/awuchen.github.io/awuchen.github.io/static/js/2.0b35be4c.chunk.js",
-    "static/js/2.0b35be4c.chunk.js.map": "/awuchen.github.io/awuchen.github.io/awuchen.github.io/static/js/2.0b35be4c.chunk.js.map",
-    "index.html": "/awuchen.github.io/awuchen.github.io/awuchen.github.io/index.html",
-    "precache-manifest.46e4e82708c131a7224a63c1bbf32b2d.js": "/awuchen.github.io/awuchen.github.io/awuchen.github.io/precache-manifest.46e4e82708c131a7224a63c1bbf32b2d.js",
-    "service-worker.js": "/awuchen.github.io/awuchen.github.io/awuchen.github.io/service-worker.js",
-    "static/css/main.523f09c5.chunk.css.map": "/awuchen.github.io/awuchen.github.io/awuchen.github.io/static/css/main.523f09c5.chunk.css.map",
-    "static/js/2.0b35be4c.chunk.js.LICENSE.txt": "/awuchen.github.io/awuchen.github.io/awuchen.github.io/static/js/2.0b35be4c.chunk.js.LICENSE.txt"
+    "main.css": "/awuchen.github.io/static/css/main.523f09c5.chunk.css",
+    "main.js": "/awuchen.github.io/static/js/main.a1714ba4.chunk.js",
+    "main.js.map": "/awuchen.github.io/static/js/main.a1714ba4.chunk.js.map",
+    "runtime-main.js": "/awuchen.github.io/static/js/runtime-main.b2a49641.js",
+    "runtime-main.js.map": "/awuchen.github.io/static/js/runtime-main.b2a49641.js.map",
+    "static/js/2.0b35be4c.chunk.js": "/awuchen.github.io/static/js/2.0b35be4c.chunk.js",
+    "static/js/2.0b35be4c.chunk.js.map": "/awuchen.github.io/static/js/2.0b35be4c.chunk.js.map",
+    "index.html": "/awuchen.github.io/index.html",
+    "precache-manifest.7910a1d5b29fe3fcf8be337c7c1ff2d9.js": "/awuchen.github.io/precache-manifest.7910a1d5b29fe3fcf8be337c7c1ff2d9.js",
+    "service-worker.js": "/awuchen.github.io/service-worker.js",
+    "static/css/main.523f09c5.chunk.css.map": "/awuchen.github.io/static/css/main.523f09c5.chunk.css.map",
+    "static/js/2.0b35be4c.chunk.js.LICENSE.txt": "/awuchen.github.io/static/js/2.0b35be4c.chunk.js.LICENSE.txt"
   },
   "entrypoints": [
-    "static/js/runtime-main.1a6a4b17.js",
+    "static/js/runtime-main.b2a49641.js",
     "static/js/2.0b35be4c.chunk.js",
     "static/css/main.523f09c5.chunk.css",
-    "static/js/main.5b85a0a9.chunk.js"
+    "static/js/main.a1714ba4.chunk.js"
   ]
 }
