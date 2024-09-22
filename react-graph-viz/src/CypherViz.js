@@ -10,7 +10,6 @@ class CypherViz extends React.Component {
       this.driver = driver;
       this.state = { 
         query: `
-        The Craft Network visualizes the intricate relationships of the craftsmen in Japan
         MATCH (n:Character)-[:INTERACTS1]->(m:Character) 
         RETURN n.name as source, m.name as target
         `,
@@ -198,6 +197,7 @@ class CypherViz extends React.Component {
           {source:"Takaaki Murase",target:"Mama-san"},
           {source:"Shiho Fukuhara",target:"Yuima Nakazato"},
           {source:"Koichi Saito",target:"Yuima Nakazato"},
+          {source:"Koichi Saito",target:"Yusai Okuda"},
 
           ]} }
     }
