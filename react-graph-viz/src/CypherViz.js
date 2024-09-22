@@ -228,7 +228,7 @@ class CypherViz extends React.Component {
           <textarea style={{display:"block",width:"800px", height:"100px"}} 
                     value={this.state.query}
                     onChange={this.handleChange}/>
-          <button onClick={this.loadData}>Reload</button>
+          <button onClick={this.loadData}>Simulate</button>
           <ForceGraph2D graphData={this.state.data} nodeId="name" 
                     linkCurvature={0.2} linkDirectionalArrowRelPos={1} linkDirectionalArrowLength={10}/>
         </div>
