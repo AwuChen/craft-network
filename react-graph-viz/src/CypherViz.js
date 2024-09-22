@@ -221,6 +221,23 @@ class CypherViz extends React.Component {
       this.setState({ data : {nodes, links}});
     }
 
+    simData = async () => {
+      let session = await this.driver.session({database:"gameofthrones"});
+      let res = await session.run(this.state.query);
+      session.close();
+      console.log(res);
+      let nodes = new Set();
+      let links = res.records.map(r => {
+        let source = r.get("source");
+        let target = r.get("target");
+        nodes.add(source);
+        nodes.add(target);
+        return {source, target}});
+      nodes = Array.from(nodes).map(name => {return {name}});
+      this.setState({ data : {nodes, links}});
+    }
+
+
     
     render() {
       return (
