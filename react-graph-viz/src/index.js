@@ -12,6 +12,7 @@ const driver = neo4j.driver(
     process.env.NEO4J_PASSWORD || 'gameofthrones'
   ),
   {
+    //encrypted: process.env.NEO4J_ENCRYPTED ? 'ENCRYPTION_ON' : 'ENCRYPTION_OFF',
     encrypted: process.env.NEO4J_ENCRYPTED = 'ENCRYPTION_ON',
   }
 )
