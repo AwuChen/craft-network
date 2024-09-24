@@ -23,7 +23,7 @@ class CypherViz extends React.Component {
           {"name":"Takahiro Yagi","color":"Green","roles":"craftsmen"},
           {"name":"Tatsuyuki Kosuga","color":"Green","roles":"craftsmen"},
           {"name":"Taeko Hosoo","color":"Purple","roles":"producer"},
-          {"name":"John","color":"Gray","roles":"researcher"},
+          {"name":"John Couch","color":"Blue","roles":"artist"},
           {"name":"Ami","color":"Purple","roles":"producer"},
           {"name":"Mae Englegeer","color":"Blue","craft":"textile","background":"Studio Mae Englegeer","roles":"artist"},
           {"name":"Hidehiko Matsumoto","color":"Green","craft":"sake","background":"Nichi Nichi","roles":"craftsmen"},
@@ -123,7 +123,8 @@ class CypherViz extends React.Component {
           {"name":"Ito ","color":"Gray","craft":"researcher","background":"Kyoto University","note":"prev bartender","roles":"researcher"},
           {"name":"Yusuke Nananishi","color":"Purple","craft":"director","background":"Kyoto Graphie","note":"friendly approachable","roles":"researcher"},
           {"name":"Mama-san","color":"Purple","craft":"networker","background":"8000 generation","note":"small cozy space","roles":"researcher"},
-          {"name":"Yuima Nakazato","color":"Purple","craft":"fashion designer","background":"Pottery","note":"Collanorated with Spiber, met through Shiho","roles":"researcher"},
+          {"name":"Yuima Nakazato","color":"Purple","craft":"fashion designer","background":"Pottery","note":"Collanorated with Spiber, met through Shiho","roles":"director"},
+          {"name":"Ako Myochin","color":"Green","craft":"samurai armour","background":"studied under the 25th head of the family, armor maker Myochin Muneyoshi, and Akira Kawanishi of the Takada family, who is in charge of preparing costumes for the Imperial Household Agency","note":"Next to HOSOO dyeing lab","roles":"craftsmen"},
 
           ],
         links:[
@@ -140,16 +141,16 @@ class CypherViz extends React.Component {
           {source:"Masataka Hosoo",target:"Mae Englegeer"},
           {source:"Masataka Hosoo",target:"Mae Englegeer"},
           {source:"Masataka Hosoo",target:"Hosai Matsubayashi"},
-          {source:"Masataka Hosoo",target:"John"},
           {source:"Masataka Hosoo",target:"Toryo Ito"},
           {source:"Masataka Hosoo",target:"Hidehiko Matsumoto"},
           {source:"Masataka Hosoo",target:"Kawakami"},
           {source:"Masataka Hosoo",target:"Ami"},
           {source:"Masataka Hosoo",target:"Mitsuru Yokoyama"},
+          {source:"Masataka Hosoo",target:"Ako Myochin"},
           {source:"Mitsuru Yokoyama",target:"Mae Englegeer"},
           {source:"Masataka Hosoo",target:"Ko Kado"},
           {source:"Masataka Hosoo",target:"Hide Suzuki"},
-          {source:"Masataka Hosoo",target:"Sky Whitehead"},
+          {source:"Sky Whitehead",target:"Masataka Hosoo"},
           {source:"Masataka Hosoo",target:"Yu Kamimura"},
           {source:"Masataka Hosoo",target:"Yuna Yagi"},
           {source:"Ami",target:"Hosai Matsubayashi"},
@@ -198,6 +199,8 @@ class CypherViz extends React.Component {
           {source:"Shiho Fukuhara",target:"Yuima Nakazato"},
           {source:"Koichi Saito",target:"Yuima Nakazato"},
           {source:"Koichi Saito",target:"Yusai Okuda"},
+          {source:"Sky Whitehead",target:"John Couch"},
+          {source:"Ako Myochin",target:"Sky Whitehead"},
 
           ]} }
     }
@@ -246,7 +249,7 @@ class CypherViz extends React.Component {
                     value={this.state.query}
                     onChange={this.handleChange}/>
           <button onClick={this.loadData}>Simulate</button>
-          <ForceGraph2D graphData={this.state.data} nodeId="name" nodeLabel=""
+          <ForceGraph2D graphData={this.state.data} nodeId="name" /*nodeLabel=""*/
                     linkCurvature={0.2} linkDirectionalArrowRelPos={1} linkDirectionalArrowLength={10}/>
         </div>
       );  
