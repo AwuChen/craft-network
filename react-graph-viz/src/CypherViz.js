@@ -249,7 +249,7 @@ class CypherViz extends React.Component {
     }
 
     visualize3D() {
-      window.open("https://www.example.com", "_blank");
+      window.open("https://awuchen.github.io/craft-network-3d/", "_blank");
     }
     
     render() {
