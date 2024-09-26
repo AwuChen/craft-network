@@ -209,6 +209,7 @@ class CypherViz extends React.Component {
       this.setState({query:event.target.value})
     }
     loadData = async () => {
+      this.disableButton();
       let session = await this.driver.session({database:"gameofthrones"});
       let res = await session.run(this.state.query);
       session.close();
@@ -240,7 +241,16 @@ class CypherViz extends React.Component {
       this.setState({ data : {nodes, links}});
     }
 
+    displayButton() {
+      const simButton = document.getElementById("simulate");
+      const visButton = document.getElementById("visualize");
+      simButton.disabled = true;
+      visButton.disabled = false;
+    }
 
+    visualize3D() {
+      window.open("https://www.example.com", "_blank");
+    }
     
     render() {
       return (
@@ -248,7 +258,8 @@ class CypherViz extends React.Component {
           <textarea style={{display:"block",width:"800px", height:"100px"}} 
                     value={this.state.query}
                     onChange={this.handleChange}/>
-          <button onClick={this.loadData}>Simulate</button>
+          <button id="simulate" onClick={this.loadData}>Simulate</button>
+          <button id="visualize" onClick={this.visualize3D}>Visualize3D</button>
           <ForceGraph2D graphData={this.state.data} nodeId="name" /*nodeLabel=""*/
                     linkCurvature={0.2} linkDirectionalArrowRelPos={1} linkDirectionalArrowLength={10}/>
         </div>
