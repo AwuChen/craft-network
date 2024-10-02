@@ -257,7 +257,7 @@ class CypherViz extends React.Component {
     
     render() {
       return (
-        <div class="flex-w-center">
+        <div width="100%">
           <textarea style={{display:"block",width:"800px", height:"100px"}} 
                     value={this.state.query}
                     onChange={this.handleChange}/>
