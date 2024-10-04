@@ -14,8 +14,8 @@ class CypherViz extends React.Component {
         RETURN n.name as source, m.name as target
         `,
         data : {nodes:[
-          {"name":"Dan Wadwhani","color":"Gray","craft":"startup","roles":"researcher"},
-          {"name":"Eugene Choi","color":"Gray","craft":"pottery","roles":"researcher"},
+          {"name":"Dan Wadwhani","color":"Gray","craft":"startup","roles":"researcher","website":"https://www.marshall.usc.edu/personnel/dan-wadhwani"},
+          {"name":"Eugene Choi","color":"Gray","craft":"pottery","roles":"researcher","website":"https://kendb.doshisha.ac.jp/profile/en.7895667c8d3ec428.html"},
           {"name":"Masataka Hosoo","color":"Purple","craft":"kimono","roles":"producer"},
           {"name":"Shuji Nakagawa","color":"Green","craft":"wood","roles":"craftsmen"},
           {"name":"Hosai Matsubayashi","color":"Green","craft":"pottery","roles":"craftsmen"},
@@ -254,6 +254,10 @@ class CypherViz extends React.Component {
     openForm(){
       window.open("https://hako.soooul.xyz/craft-network/", "_blank");
     }
+
+    openWebsite(address){
+      if(address != 'undefined')window.open(address, '_blank')
+    }
     
     render() {
       return (
@@ -265,7 +269,8 @@ class CypherViz extends React.Component {
           <button id="visualize" onClick={this.visualize3D}>Visualize3D</button>
           <button id="form" onClick={this.openForm}>Onboard</button>
           <ForceGraph2D graphData={this.state.data} nodeId="name" nodeLabel="craft"
-                    linkCurvature={0.2} linkDirectionalArrowRelPos={1} linkDirectionalArrowLength={10}/>
+                    linkCurvature={0.2} linkDirectionalArrowRelPos={1} linkDirectionalArrowLength={10}
+                    onNodeClick={node => this.openWebsite(`${node.website}`)}/>
         </div>
       );  
     }
