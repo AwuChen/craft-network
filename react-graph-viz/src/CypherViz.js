@@ -279,7 +279,7 @@ openWebsite(address){
 render() {
   return (
     <div width="100%">
-    <textarea style={{display:"block",width:"800px", height:"100px"}} 
+    <textarea style={{display:"block",width:"100%", height:"100px"}} 
     value={this.state.query}
     onChange={this.handleChange}/>
     <button id="simulate" onClick={this.loadData}>Simulate</button>
