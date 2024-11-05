@@ -16,7 +16,7 @@ class CypherViz extends React.Component {
       data : {nodes:[
         {"name":"Dan Wadwhani","color":"Gray","craft":"business historian","roles":"researcher","website":"https://www.marshall.usc.edu/personnel/dan-wadhwani"},
         {"name":"Eugene Choi","color":"Gray","craft":"digitization of craft","roles":"researcher","website":"https://kendb.doshisha.ac.jp/profile/en.7895667c8d3ec428.html"},
-        {"name":"Masataka Hosoo","color":"Purple","craft":"kimono","roles":"producer","website":"https://www.hosoo.co.jp/en/story/"},
+        {"name":"Masataka Hosoo","color":"Purple","craft":"digital textile","roles":"producer","website":"https://youtu.be/ZqszIG2Vi30"},
         {"name":"John Hijika","color":"Blue","craft":"craft as art","roles":"curator","website":"https://www.instagram.com/hijika_agenda/?hl=en"},
         {"name":"Shuji Nakagawa","color":"Green","craft":"wood","roles":"craftsmen","website":"http://www.nakagawa-mokkougei.com/"},
         {"name":"Hosai Matsubayashi","color":"Green","craft":"pottery","roles":"craftsmen","website":"https://asahiyaki.com/"},
@@ -44,7 +44,7 @@ class CypherViz extends React.Component {
         {"name":"Eddie","color":"Gold","roles":"patron"},
         {"name":"Yuki Kataoka","color":"Green","craft":"bike","roles":"craftsmen","website":"https://vigore.co.jp/"},
         {"name":"Michael Kozlowski","color":"Blue","roles":"artist"},
-        {"name":"Koichi Saito","color":"Purple","craft":"silk","roles":"producer"},
+        {"name":"Koichi Saito","color":"Purple","craft":"silk","roles":"producer","website":"https://spiber.inc/en/"},
         {"name":"Osawa Kiyomi","color":"Green","craft":"embroidery","roles":"craftsmen","website":"https://osawashokai.jp/"},
         {"name":"Daido-san","color":"Green","craft":"dye","roles":"craftsmen"},
         {"name":"Yui Tanaka","color":"Blue","roles":"artist"},
@@ -273,7 +273,7 @@ openForm(){
 }
 
 openWebsite(address){
-  if(address !== 'undefined')window.open(address, '_blank')
+  if(address !== 'undefined')window.open(address, '_self')
 }
 
 render() {
