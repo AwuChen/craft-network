@@ -24,7 +24,7 @@ class CypherViz extends React.Component {
         {"name":"Takahiro Yagi","color":"Green","craft":"tea caddy","roles":"craftsmen","website":"https://www.kaikado.jp/"},
         {"name":"Tatsuyuki Kosuga","color":"Green","craft":"bamboo","roles":"craftsmen","website":"https://www.kohchosai.co.jp/"},
         {"name":"Taeko Hosoo","color":"Purple","craft":"kimono","roles":"producer","website":"https://www.hosoo.co.jp/en/story/"},
-        {"name":"Ami Miura","color":"Yellow","craft":"experience","roles":"producer","website":"https://jinsei-keiko.com/en/"},
+        {"name":"Ami Miura","color":"Purple","craft":"life wisdom","roles":"producer","website":"https://jinsei-keiko.com/en/"},
         {"name":"Mae Englegeer","color":"Blue","craft":"textile","background":"Studio Mae Englegeer","roles":"artist","website":"https://www.mae-engelgeer.nl/"},
         {"name":"Hidehiko Matsumoto","color":"Green","craft":"sake","background":"Nichi Nichi","roles":"craftsmen","website":"https://sake.inc/"},
         {"name":"Yoshida Shinichiro","color":"Green","craft":"hemp","roles":"craftsmen","website":"https://www.instagram.com/shinmyouan/"},
