@@ -1,3 +1,0 @@
-The Craft Network was made using data collected in-person from craftsmen in Kyoto Japan and rendered using three-js via https://github.com/vasturiano/3d-force-graph[3d-force-graph] which is a really cool repository.
-
-
