@@ -269,7 +269,7 @@ visualize3D() {
 }
 
 openForm(){
-  window.open("https://hako.soooul.xyz/craft-network/", "_blank");
+  window.open("https://hako.soooul.xyz/apply/", "_blank");
 }
 
 openWebsite(address){
