@@ -13,34 +13,20 @@ class CypherViz extends React.Component {
       `,
       data: JSON.parse(localStorage.getItem('graphData')) || {
         nodes: [
-          { "name": "Dan Wadwhani", "color": "Gray", "craft": "business historian", "roles": "researcher", "website": "https://www.marshall.usc.edu/personnel/dan-wadhwani" },
-          { "name": "Eugene Choi", "color": "Gray", "craft": "digitization of craft", "roles": "researcher", "website": "https://kendb.doshisha.ac.jp/profile/en.7895667c8d3ec428.html" },
-          { "name": "Awu Chen", "color": "White", "craft": "AI", "roles": "user", "website": "https://www.youtube.com/embed/ZqszIG2Vi30?start" },
-          { "name": "John Hijika", "color": "Blue", "craft": "curator", "roles": "curator", "website": "https://www.instagram.com/hijika_agenda/?hl=en" }
+          { name: 'Awu Chen', color: 'White', craft: 'AI', roles: 'user', website: 'https://www.youtube.com/embed/ZqszIG2Vi30?start' }
         ],
-        links: [
-          { "source": "Dan Wadwhani", "target": "Eugene Choi" },
-          { "source": "Eugene Choi", "target": "Awu Chen" },
-          { "source": "Awu Chen", "target": "John Hijika" }
-        ]
+        links: []
       }
     };
   }
 
   componentDidMount() {
-    if (!localStorage.getItem('graphData')) {
-      this.addNodeToAwuChen();
-    }
+    this.addNodeToAwuChen();
   }
 
   addNodeToAwuChen = () => {
+    const newNodeName = `New Node ${Date.now()}`;
     this.setState(prevState => {
-      const existingNodes = prevState.data.nodes.map(node => node.name);
-      if (!existingNodes.includes('Awu Chen')) {
-        console.error("Awu Chen not found in nodes.");
-        return prevState;
-      }
-      const newNodeName = `New Node ${Date.now()}`;
       const updatedData = {
         nodes: [...prevState.data.nodes, { name: newNodeName, color: 'Gray', craft: 'Auto-Generated' }],
         links: [...prevState.data.links, { source: 'Awu Chen', target: newNodeName }]
