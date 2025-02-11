@@ -7,11 +7,7 @@ class CypherViz extends React.Component {
     super();
     this.driver = driver;
     this.state = {
-      query: `
-      MATCH (n:Character)-[:INTERACTS1]->(m:Character) 
-      RETURN n.name as source, m.name as target
-      `,
-      data: {
+      data: JSON.parse(localStorage.getItem('graphData')) || {
         nodes: [
           { name: 'Awu Chen', color: 'White', craft: 'AI', roles: 'user', website: 'https://www.youtube.com/embed/ZqszIG2Vi30?start' }
         ],
@@ -26,12 +22,14 @@ class CypherViz extends React.Component {
 
   addNodeToAwuChen = () => {
     const newNodeName = `New Node ${Date.now()}`;
-    this.setState(prevState => ({
-      data: {
+    this.setState(prevState => {
+      const updatedData = {
         nodes: [...prevState.data.nodes, { name: newNodeName, color: 'Gray', craft: 'Auto-Generated' }],
         links: [...prevState.data.links, { source: 'Awu Chen', target: newNodeName }]
-      }
-    }));
+      };
+      localStorage.setItem('graphData', JSON.stringify(updatedData));
+      return { data: updatedData };
+    });
   };
 
   render() {
