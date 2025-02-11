@@ -7,11 +7,22 @@ class CypherViz extends React.Component {
     super();
     this.driver = driver;
     this.state = {
+      query: `
+      MATCH (n:Character)-[:INTERACTS1]->(m:Character) 
+      RETURN n.name as source, m.name as target
+      `,
       data: JSON.parse(localStorage.getItem('graphData')) || {
         nodes: [
-          { name: 'Awu Chen', color: 'White', craft: 'AI', roles: 'user', website: 'https://www.youtube.com/embed/ZqszIG2Vi30?start' }
+          { "name": "Dan Wadwhani", "color": "Gray", "craft": "business historian", "roles": "researcher", "website": "https://www.marshall.usc.edu/personnel/dan-wadhwani" },
+          { "name": "Eugene Choi", "color": "Gray", "craft": "digitization of craft", "roles": "researcher", "website": "https://kendb.doshisha.ac.jp/profile/en.7895667c8d3ec428.html" },
+          { "name": "Awu Chen", "color": "White", "craft": "AI", "roles": "user", "website": "https://www.youtube.com/embed/ZqszIG2Vi30?start" },
+          { "name": "John Hijika", "color": "Blue", "craft": "curator", "roles": "curator", "website": "https://www.instagram.com/hijika_agenda/?hl=en" }
         ],
-        links: []
+        links: [
+          { "source": "Dan Wadwhani", "target": "Eugene Choi" },
+          { "source": "Eugene Choi", "target": "Awu Chen" },
+          { "source": "Awu Chen", "target": "John Hijika" }
+        ]
       }
     };
   }
@@ -32,10 +43,40 @@ class CypherViz extends React.Component {
     });
   };
 
+  handleChange = (event) => {
+    this.setState({ query: event.target.value });
+  };
+
+  loadData = async () => {
+    let session = await this.driver.session({ database: "gameofthrones" });
+    let res = await session.run(this.state.query);
+    session.close();
+    console.log(res);
+    let nodes = new Set();
+    let links = res.records.map(r => {
+      let source = r.get("source");
+      let target = r.get("target");
+      nodes.add(source);
+      nodes.add(target);
+      return { source, target };
+    });
+    nodes = Array.from(nodes).map(name => ({ name }));
+    const updatedData = { nodes, links };
+    localStorage.setItem('graphData', JSON.stringify(updatedData));
+    this.setState({ data: updatedData });
+  };
+
   render() {
     return (
       <div width="100%">
-        <button onClick={this.addNodeToAwuChen}>Add Node to Awu Chen</button>
+        <textarea
+          style={{ display: "block", width: "100%", height: "100px" }}
+          value={this.state.query}
+          onChange={this.handleChange}
+        />
+        <button id="simulate" onClick={this.loadData}>Simulate</button>
+        <button id="visualize" onClick={() => window.open("https://awuchen.github.io/craft-network-3d/", "_blank")}>Visualize3D</button>
+        <button id="form" onClick={() => window.open("https://hako.soooul.xyz/apply/", "_blank")}>Onboard</button>
         <ForceGraph2D
           graphData={this.state.data}
           nodeId="name"
