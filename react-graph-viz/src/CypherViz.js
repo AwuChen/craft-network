@@ -2,13 +2,11 @@ import React from 'react';
 import './App.css';
 import ForceGraph2D from 'react-force-graph-2d';
 
-// Usage: <CypherViz driver={driver}/>
-
 class CypherViz extends React.Component {
-  constructor({driver}) {
+  constructor({ driver }) {
     super();
     this.driver = driver;
-    this.state = { 
+    this.state = {
       query: `
       MATCH (n:Character)-[:INTERACTS1]->(m:Character) 
       RETURN n.name as source, m.name as target
@@ -222,75 +220,68 @@ links:[
   ]} }
 }
 
-handleChange = (event) => {
-  this.setState({query:event.target.value})
-}
-loadData = async () => {
-  let session = await this.driver.session({database:"gameofthrones"});
-  let res = await session.run(this.state.query);
-  session.close();
-  console.log(res);
-  let nodes = new Set();
-  let links = res.records.map(r => {
-    let source = r.get("source");
-    let target = r.get("target");
-    nodes.add(source);
-    nodes.add(target);
-    return {source, target}});
-  nodes = Array.from(nodes).map(name => {return {name}});
-  this.setState({ data : {nodes, links}});
-}
+  componentDidMount() {
+    this.addNodeNFC();
+  }
 
-simData = async () => {
-  let session = await this.driver.session({database:"gameofthrones"});
-  let res = await session.run(this.state.query);
-  session.close();
-  console.log(res);
-  let nodes = new Set();
-  let links = res.records.map(r => {
-    let source = r.get("source");
-    let target = r.get("target");
-    nodes.add(source);
-    nodes.add(target);
-    return {source, target}});
-  nodes = Array.from(nodes).map(name => {return {name}});
-  this.setState({ data : {nodes, links}});
-}
+  addNodeNFC = () => {
+    const newNodeName = `New Node ${Date.now()}`;
+    this.setState(prevState => {
+      const updatedData = {
+        nodes: [...prevState.data.nodes, { name: newNodeName, color: 'Gray', craft: 'NFC User' }],
+        links: [...prevState.data.links, { source: 'Masataka Hosoo', target: newNodeName }]
+      };
+      localStorage.setItem('graphData', JSON.stringify(updatedData));
+      return { data: updatedData };
+    });
+  };
 
-displayButton() {
-  const simButton = document.getElementById("simulate");
-  const visButton = document.getElementById("visualize");
-  simButton.disabled = true;
-  visButton.disabled = false;
-}
+  handleChange = (event) => {
+    this.setState({ query: event.target.value });
+  };
 
-visualize3D() {
-  window.open("https://awuchen.github.io/craft-network-3d/", "_blank");
-}
+  loadData = async () => {
+    let session = await this.driver.session({ database: "gameofthrones" });
+    let res = await session.run(this.state.query);
+    session.close();
+    console.log(res);
+    let nodes = new Set();
+    let links = res.records.map(r => {
+      let source = r.get("source");
+      let target = r.get("target");
+      nodes.add(source);
+      nodes.add(target);
+      return { source, target };
+    });
+    nodes = Array.from(nodes).map(name => ({ name }));
+    const updatedData = { nodes, links };
+    localStorage.setItem('graphData', JSON.stringify(updatedData));
+    this.setState({ data: updatedData });
+  };
 
-openForm(){
-  window.open("https://hako.soooul.xyz/apply/", "_blank");
-}
-
-openWebsite(address){
-  if(address !== 'undefined')window.open(address, 'New Window', 'width=500px,height=500px')
-}
-
-render() {
-  return (
-    <div width="100%">
-    <textarea style={{display:"block",width:"100%", height:"100px"}} 
-    value={this.state.query}
-    onChange={this.handleChange}/>
-    <button id="simulate" onClick={this.loadData}>Simulate</button>
-    <button id="visualize" onClick={this.visualize3D}>Visualize3D</button>
-    <button id="form" onClick={this.openForm}>Onboard</button>
-    <ForceGraph2D graphData={this.state.data} nodeId="name" nodeLabel="craft"
-    linkCurvature={0.2} linkDirectionalArrowRelPos={1} linkDirectionalArrowLength={10}
-    onNodeClick={node => this.openWebsite(`${node.website}`)}/>
-    </div>
-    );  
+  render() {
+    return (
+      <div width="100%">
+        <textarea
+          style={{ display: "block", width: "100%", height: "100px" }}
+          value={this.state.query}
+          onChange={this.handleChange}
+        />
+        <button id="simulate" onClick={this.loadData}>Simulate</button>
+        <button id="visualize" onClick={() => window.open("https://awuchen.github.io/craft-network-3d/", "_blank")}>Visualize3D</button>
+        <button id="form" onClick={() => window.open("https://hako.soooul.xyz/apply/", "_blank")}>Onboard</button>
+        <ForceGraph2D
+          graphData={this.state.data}
+          nodeId="name"
+          nodeLabel="craft"
+          linkCurvature={0.2}
+          linkDirectionalArrowRelPos={1}
+          linkDirectionalArrowLength={10}
+          onNodeClick={node => window.open(node.website, 'New Window', 'width=500px,height=500px')}
+        />
+      </div>
+    );
   }
 }
 
-export default CypherViz
+export default CypherViz;
