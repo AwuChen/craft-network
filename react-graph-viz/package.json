@@ -11,11 +11,12 @@
     "react": "^16.13.1",
     "react-dom": "^16.13.1",
     "react-force-graph-2d": "^1.16.3",
+    "react-router-dom": "^6.29.0",
     "react-scripts": "3.4.1"
   },
   "scripts": {
-    "predeploy" : "npm run build",
-    "deploy" : "gh-pages -d build",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d build",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",

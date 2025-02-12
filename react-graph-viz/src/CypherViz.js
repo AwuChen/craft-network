@@ -1,4 +1,5 @@
 import React from 'react';
+import { HashRouter as Router, Route, Routes, useLocation, Navigate } from 'react-router-dom';
 import './App.css';
 import ForceGraph2D from 'react-force-graph-2d';
 
@@ -8,7 +9,7 @@ class CypherViz extends React.Component {
     this.driver = driver;
     const storedData = localStorage.getItem('graphData');
     const defaultData = {
-      nodes:[
+      nodes: [
         {"name":"Dan Wadwhani","color":"Gray","craft":"business historian","roles":"researcher","website":"https://www.marshall.usc.edu/personnel/dan-wadhwani"},
         {"name":"Eugene Choi","color":"Gray","craft":"digitization of craft","roles":"researcher","website":"https://kendb.doshisha.ac.jp/profile/en.7895667c8d3ec428.html"},
         {"name":"Masataka Hosoo","color":"Gold","craft":"digital textile","roles":"producer","website":"https://www.youtube.com/embed/ZqszIG2Vi30?start"},
@@ -226,7 +227,6 @@ links:[
   }
 
   componentDidMount() {
-    this.addNodeNFC();
     this.persistGraphData();
   }
 
@@ -276,27 +276,46 @@ links:[
 
   render() {
     return (
-      <div width="100%">
-        <textarea
-          style={{ display: "block", width: "100%", height: "100px" }}
-          value={this.state.query}
-          onChange={this.handleChange}
-        />
-        <button id="simulate" onClick={this.loadData}>Simulate</button>
-        <button id="visualize" onClick={() => window.open("https://awuchen.github.io/craft-network-3d/", "_blank")}>Visualize3D</button>
-        <button id="form" onClick={() => window.open("https://hako.soooul.xyz/apply/", "_blank")}>Onboard</button>
-        <ForceGraph2D
-          graphData={this.state.data}
-          nodeId="name"
-          nodeLabel="craft"
-          linkCurvature={0.2}
-          linkDirectionalArrowRelPos={1}
-          linkDirectionalArrowLength={10}
-          onNodeClick={node => window.open(node.website, 'New Window', 'width=500px,height=500px')}
-        />
-      </div>
+      <Router>
+        <Routes>
+          <Route path="/NFC" element={<NFCTrigger addNode={this.addNodeNFC} />} />
+          <Route path="/" element={this.renderGraph()} />
+        </Routes>
+      </Router>
     );
   }
+
+  renderGraph = () => (
+    <div width="100%">
+      <textarea
+        style={{ display: "block", width: "100%", height: "100px" }}
+        value={this.state.query}
+        onChange={this.handleChange}
+      />
+      <button id="simulate" onClick={this.loadData}>Simulate</button>
+      <button id="visualize" onClick={() => window.open("https://awuchen.github.io/craft-network-3d/", "_blank")}>Visualize3D</button>
+      <button id="form" onClick={() => window.open("https://hako.soooul.xyz/apply/", "_blank")}>Onboard</button>
+      <ForceGraph2D
+        graphData={this.state.data}
+        nodeId="name"
+        nodeLabel="craft"
+        linkCurvature={0.2}
+        linkDirectionalArrowRelPos={1}
+        linkDirectionalArrowLength={10}
+        onNodeClick={node => window.open(node.website, 'New Window', 'width=500px,height=500px')}
+      />
+    </div>
+  );
 }
+
+const NFCTrigger = ({ addNode }) => {
+  const location = useLocation();
+
+  React.useEffect(() => {
+    addNode();
+  }, [location]);
+
+  return <Navigate to="/" />;
+};
 
 export default CypherViz;
