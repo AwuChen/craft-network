@@ -6,12 +6,9 @@ class CypherViz extends React.Component {
   constructor({ driver }) {
     super();
     this.driver = driver;
-    this.state = {
-      query: `
-      MATCH (n:Character)-[:INTERACTS1]->(m:Character) 
-      RETURN n.name as source, m.name as target
-      `,
-      data : {nodes:[
+    const storedData = localStorage.getItem('graphData');
+    const defaultData = {
+      nodes:[
         {"name":"Dan Wadwhani","color":"Gray","craft":"business historian","roles":"researcher","website":"https://www.marshall.usc.edu/personnel/dan-wadhwani"},
         {"name":"Eugene Choi","color":"Gray","craft":"digitization of craft","roles":"researcher","website":"https://kendb.doshisha.ac.jp/profile/en.7895667c8d3ec428.html"},
         {"name":"Masataka Hosoo","color":"Gold","craft":"digital textile","roles":"producer","website":"https://www.youtube.com/embed/ZqszIG2Vi30?start"},
@@ -216,19 +213,37 @@ links:[
   {source:"Kaori Sasayama",target:"Tenshin Juba"},
   {source:"Kaori Sasayama",target:"Kondaya Genbei"},
   {source:"John Hijika",target:"Masayo Funakoshi"},
-  {source:"Nanao Kobayashi",target:"Masayo Funakoshi"},
-  ]} }
-}
+  {source:"Nanao Kobayashi",target:"Masayo Funakoshi"}
+  ]
+    };
+    this.state = {
+      query: `
+      MATCH (n:Character)-[:INTERACTS1]->(m:Character) 
+      RETURN n.name as source, m.name as target
+      `,
+      data: storedData ? JSON.parse(storedData) : defaultData
+    };
+  }
 
   componentDidMount() {
     this.addNodeNFC();
+    this.persistGraphData();
   }
 
+  persistGraphData = () => {
+    localStorage.setItem('graphData', JSON.stringify(this.state.data));
+  };
+
   addNodeNFC = () => {
-    const newNodeName = `New Node ${Date.now()}`;
     this.setState(prevState => {
+      const existingNodes = prevState.data.nodes.map(node => node.name);
+      if (!existingNodes.includes('Masataka Hosoo')) {
+        console.error("Masataka Hosoo not found in nodes.");
+        return prevState;
+      }
+      const newNodeName = `New Node ${Date.now()}`;
       const updatedData = {
-        nodes: [...prevState.data.nodes, { name: newNodeName, color: 'Gray', craft: 'NFC User' }],
+        nodes: [...prevState.data.nodes, { name: newNodeName, color: 'Gray', craft: 'Auto-Generated' }],
         links: [...prevState.data.links, { source: 'Masataka Hosoo', target: newNodeName }]
       };
       localStorage.setItem('graphData', JSON.stringify(updatedData));
@@ -256,7 +271,7 @@ links:[
     nodes = Array.from(nodes).map(name => ({ name }));
     const updatedData = { nodes, links };
     localStorage.setItem('graphData', JSON.stringify(updatedData));
-    this.setState({ data: updatedData });
+    this.setState({ data: updatedData }, this.persistGraphData);
   };
 
   render() {
