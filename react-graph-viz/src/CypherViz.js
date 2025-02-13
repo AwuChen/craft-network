@@ -354,7 +354,7 @@ links:[
           ctx.fill();
           if (node.isNew) ctx.stroke();
 
-          ctx.fillStyle = "black";
+          ctx.fillStyle = "gray";
           if (node.isNew) {
             ctx.fillText(label, node.x + 8, node.y + 8);
           }
