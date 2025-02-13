@@ -241,15 +241,19 @@ links:[
         console.error("Masataka Hosoo not found in nodes.");
         return prevState;
       }
-      const newNodeName = `New Node ${Date.now()}`;
+      const newNodeName = `New Connect ${Date.now()}`;
       const updatedData = {
-        nodes: [...prevState.data.nodes, { name: newNodeName, color: 'Gray', craft: 'Auto-Generated' }],
+        nodes: [
+          ...prevState.data.nodes,
+          { name: newNodeName, color: 'white', craft: 'Auto-Generated', size: 10, isNew: true, website: 'https://hako.soooul.xyz/apply/' }
+        ],
         links: [...prevState.data.links, { source: 'Masataka Hosoo', target: newNodeName }]
       };
       localStorage.setItem('graphData', JSON.stringify(updatedData));
       return { data: updatedData };
     });
   };
+
 
   handleChange = (event) => {
     this.setState({ query: event.target.value });
@@ -299,6 +303,27 @@ links:[
         graphData={this.state.data}
         nodeId="name"
         nodeLabel="craft"
+        nodeCanvasObject={(node, ctx, globalScale) => {
+          const label = node.name;
+          const fontSize = (node.isNew ? 15 : 0) / globalScale;
+          ctx.font = `${fontSize}px Sans-Serif`;
+          
+          if (node.isNew) {
+            ctx.fillStyle = "white";
+            ctx.strokeStyle = "black";
+            ctx.lineWidth = 2;
+          } else {
+            ctx.fillStyle = node.color;
+          }
+          
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, node.isNew ? 10 : 5, 0, 2 * Math.PI, false);
+          ctx.fill();
+          if (node.isNew) ctx.stroke();
+          
+          ctx.fillStyle = "black";
+          ctx.fillText(label, node.x + 8, node.y + 8);
+        }}
         linkCurvature={0.2}
         linkDirectionalArrowRelPos={1}
         linkDirectionalArrowLength={10}
@@ -306,6 +331,7 @@ links:[
       />
     </div>
   );
+
 }
 
 const NFCTrigger = ({ addNode }) => {
