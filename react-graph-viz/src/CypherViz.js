@@ -7,8 +7,8 @@ class CypherViz extends React.Component {
   constructor({ driver }) {
     super();
     this.driver = driver;
-    const storedData = localStorage.getItem('graphData');
-    const defaultData = {
+
+    this.defaultData = {
       nodes: [
         {"name":"Dan Wadwhani","color":"Gray","craft":"business historian","roles":"researcher","website":"https://www.marshall.usc.edu/personnel/dan-wadhwani"},
         {"name":"Eugene Choi","color":"Gray","craft":"digitization of craft","roles":"researcher","website":"https://kendb.doshisha.ac.jp/profile/en.7895667c8d3ec428.html"},
@@ -222,17 +222,46 @@ links:[
       MATCH (n:Character)-[:INTERACTS1]->(m:Character) 
       RETURN n.name as source, m.name as target
       `,
-      data: storedData ? JSON.parse(storedData) : defaultData
+      data: this.loadGraphData()
     };
   }
 
-  componentDidMount() {
-    this.persistGraphData();
-  }
+  loadGraphData = () => {
+    try {
+      const storedData = JSON.parse(localStorage.getItem('graphData'));
+      if (!storedData || !Array.isArray(storedData.nodes) || !Array.isArray(storedData.links)) {
+        console.warn("Invalid graph data found in localStorage. Resetting...");
+        this.resetData();
+        return this.defaultData;
+      }
+
+      // Ensure all nodes have x, y positions
+      return {
+        nodes: storedData.nodes.map(node => ({
+          ...node,
+          x: node.x || Math.random() * 500,
+          y: node.y || Math.random() * 500
+        })),
+        links: storedData.links
+      };
+    } catch (e) {
+      console.error("Error parsing local storage data:", e);
+      this.resetData();
+      return this.defaultData;
+    }
+  };
 
   persistGraphData = () => {
     localStorage.setItem('graphData', JSON.stringify(this.state.data));
   };
+
+  resetData = () => {
+    localStorage.setItem('graphData', JSON.stringify(this.defaultData));
+  };
+
+  componentDidMount() {
+    this.persistGraphData();
+  }
 
   addNodeNFC = () => {
     this.setState(prevState => {
@@ -241,19 +270,20 @@ links:[
         console.error("Masataka Hosoo not found in nodes.");
         return prevState;
       }
+
       const newNodeName = `New Connect ${Date.now()}`;
       const updatedData = {
         nodes: [
           ...prevState.data.nodes,
-          { name: newNodeName, color: 'white', craft: 'Auto-Generated', size: 10, isNew: true, website: 'https://hako.soooul.xyz/apply/' }
+          { name: newNodeName, color: 'white', craft: 'Auto-Generated', size: 10, isNew: true, website: 'https://hako.soooul.xyz/apply/', x: Math.random() * 500, y: Math.random() * 500 }
         ],
         links: [...prevState.data.links, { source: 'Masataka Hosoo', target: newNodeName }]
       };
+
       localStorage.setItem('graphData', JSON.stringify(updatedData));
       return { data: updatedData };
-    });
+    }, this.persistGraphData);
   };
-
 
   handleChange = (event) => {
     this.setState({ query: event.target.value });
@@ -264,6 +294,7 @@ links:[
     let res = await session.run(this.state.query);
     session.close();
     console.log(res);
+
     let nodes = new Set();
     let links = res.records.map(r => {
       let source = r.get("source");
@@ -272,7 +303,8 @@ links:[
       nodes.add(target);
       return { source, target };
     });
-    nodes = Array.from(nodes).map(name => ({ name }));
+
+    nodes = Array.from(nodes).map(name => ({ name, x: Math.random() * 500, y: Math.random() * 500 }));
     const updatedData = { nodes, links };
     localStorage.setItem('graphData', JSON.stringify(updatedData));
     this.setState({ data: updatedData }, this.persistGraphData);
@@ -299,15 +331,16 @@ links:[
       <button id="simulate" onClick={this.loadData}>Simulate</button>
       <button id="visualize" onClick={() => window.open("https://awuchen.github.io/craft-network-3d/", "_blank")}>Visualize3D</button>
       <button id="form" onClick={() => window.open("https://hako.soooul.xyz/apply/", "_blank")}>Onboard</button>
+      <button id="reset" onClick={() => { this.resetData(); window.location.reload(); }}>Reset</button>
       <ForceGraph2D
         graphData={this.state.data}
         nodeId="name"
         nodeLabel="craft"
         nodeCanvasObject={(node, ctx, globalScale) => {
           const label = node.name;
-          const fontSize = (node.isNew ? 15 : 0) / globalScale;
+          const fontSize = (node.isNew ? 10 : 0) / globalScale;
           ctx.font = `${fontSize}px Sans-Serif`;
-          
+
           if (node.isNew) {
             ctx.fillStyle = "white";
             ctx.strokeStyle = "black";
@@ -315,30 +348,35 @@ links:[
           } else {
             ctx.fillStyle = node.color;
           }
-          
+
           ctx.beginPath();
           ctx.arc(node.x, node.y, node.isNew ? 10 : 5, 0, 2 * Math.PI, false);
           ctx.fill();
           if (node.isNew) ctx.stroke();
-          
+
           ctx.fillStyle = "black";
-          ctx.fillText(label, node.x + 8, node.y + 8);
+          if (node.isNew) {
+            ctx.fillText(label, node.x + 8, node.y + 8);
+          }
         }}
         linkCurvature={0.2}
         linkDirectionalArrowRelPos={1}
         linkDirectionalArrowLength={10}
-        onNodeClick={node => window.open(node.website, 'New Window', 'width=500px,height=500px')}
+        onNodeClick={node => node.website && window.open(node.website, 'New Window', 'width=500px,height=500px')}
       />
     </div>
   );
-
 }
 
 const NFCTrigger = ({ addNode }) => {
   const location = useLocation();
+  const firstRender = React.useRef(true);
 
   React.useEffect(() => {
-    addNode();
+    if (firstRender.current) {
+      firstRender.current = false;
+      addNode();
+    }
   }, [location]);
 
   return <Navigate to="/" />;
