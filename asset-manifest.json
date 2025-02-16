@@ -1,22 +1,22 @@
 {
   "files": {
     "main.css": "/craft-network/static/css/main.523f09c5.chunk.css",
-    "main.js": "/craft-network/static/js/main.821bbc8a.chunk.js",
-    "main.js.map": "/craft-network/static/js/main.821bbc8a.chunk.js.map",
+    "main.js": "/craft-network/static/js/main.1d10653f.chunk.js",
+    "main.js.map": "/craft-network/static/js/main.1d10653f.chunk.js.map",
     "runtime-main.js": "/craft-network/static/js/runtime-main.ad10f8df.js",
     "runtime-main.js.map": "/craft-network/static/js/runtime-main.ad10f8df.js.map",
-    "static/js/2.a7226217.chunk.js": "/craft-network/static/js/2.a7226217.chunk.js",
-    "static/js/2.a7226217.chunk.js.map": "/craft-network/static/js/2.a7226217.chunk.js.map",
+    "static/js/2.74929cca.chunk.js": "/craft-network/static/js/2.74929cca.chunk.js",
+    "static/js/2.74929cca.chunk.js.map": "/craft-network/static/js/2.74929cca.chunk.js.map",
     "index.html": "/craft-network/index.html",
-    "precache-manifest.362cbb216e1388b5162ffed573c9479b.js": "/craft-network/precache-manifest.362cbb216e1388b5162ffed573c9479b.js",
+    "precache-manifest.caa812587245fb8ad3bc63fcd1b24bf1.js": "/craft-network/precache-manifest.caa812587245fb8ad3bc63fcd1b24bf1.js",
     "service-worker.js": "/craft-network/service-worker.js",
     "static/css/main.523f09c5.chunk.css.map": "/craft-network/static/css/main.523f09c5.chunk.css.map",
-    "static/js/2.a7226217.chunk.js.LICENSE.txt": "/craft-network/static/js/2.a7226217.chunk.js.LICENSE.txt"
+    "static/js/2.74929cca.chunk.js.LICENSE.txt": "/craft-network/static/js/2.74929cca.chunk.js.LICENSE.txt"
   },
   "entrypoints": [
     "static/js/runtime-main.ad10f8df.js",
-    "static/js/2.a7226217.chunk.js",
+    "static/js/2.74929cca.chunk.js",
     "static/css/main.523f09c5.chunk.css",
-    "static/js/main.821bbc8a.chunk.js"
+    "static/js/main.1d10653f.chunk.js"
   ]
 }
