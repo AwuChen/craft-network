@@ -12,7 +12,7 @@ class CypherViz extends React.Component {
       nodes: [
         {"name":"Dan Wadwhani","color":"Gray","craft":"business historian","roles":"researcher","website":"https://www.marshall.usc.edu/personnel/dan-wadhwani"},
         {"name":"Eugene Choi","color":"Gray","craft":"digitization of craft","roles":"researcher","website":"https://kendb.doshisha.ac.jp/profile/en.7895667c8d3ec428.html"},
-        {"name":"Masataka Hosoo","color":"Gold","craft":"digital textile","roles":"producer","website":"https://www.youtube.com/embed/ZqszIG2Vi30?start"},
+        {"name":"Masataka Hosoo","color":"White","craft":"digital craft","roles":"producer","website":"https://awuchen.github.io/"},
         {"name":"John Hijika","color":"Blue","craft":"curator","roles":"curator","website":"https://www.instagram.com/hijika_agenda/?hl=en"},
         {"name":"Shuji Nakagawa","color":"Green","craft":"wood","roles":"craftsmen","website":"http://www.nakagawa-mokkougei.com/"},
         {"name":"Hosai Matsubayashi","color":"Green","craft":"pottery","roles":"craftsmen","website":"https://asahiyaki.com/"},
@@ -271,11 +271,11 @@ links:[
         return prevState;
       }
 
-      const newNodeName = `New Connect ${Date.now()}`;
+      const newNodeName = `User ${Date.now()}`;
       const updatedData = {
         nodes: [
           ...prevState.data.nodes,
-          { name: newNodeName, color: 'white', craft: 'Auto-Generated', size: 10, isNew: true, website: 'https://hako.soooul.xyz/apply/', x: Math.random() * 500, y: Math.random() * 500 }
+          { name: newNodeName, color: 'white', craft: 'NFC-Generated', size: 10, isNew: true, website: 'https://hako.soooul.xyz/apply/', x: Math.random() * 500, y: Math.random() * 500 }
         ],
         links: [...prevState.data.links, { source: 'Masataka Hosoo', target: newNodeName }]
       };
@@ -322,9 +322,9 @@ links:[
   }
 
   renderGraph = () => (
-    <div width="100%">
+    <div width="95%">
       <textarea
-        style={{ display: "block", width: "100%", height: "100px" }}
+        style={{ display: "block", width: "95%", height: "100px", margin: "0 auto", textAlign: "center"}}
         value={this.state.query}
         onChange={this.handleChange}
       />
