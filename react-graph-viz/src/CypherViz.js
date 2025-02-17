@@ -290,10 +290,9 @@ links:[
   };
 
   loadData = async () => {
-    let session = await this.driver.session({ database: "gameofthrones" });
+    let session = this.driver.session({ database: "neo4j" });
     let res = await session.run(this.state.query);
     session.close();
-    console.log(res);
 
     let nodes = new Set();
     let links = res.records.map(r => {
@@ -307,7 +306,7 @@ links:[
     nodes = Array.from(nodes).map(name => ({ name, x: Math.random() * 500, y: Math.random() * 500 }));
     const updatedData = { nodes, links };
     localStorage.setItem('graphData', JSON.stringify(updatedData));
-    this.setState({ data: updatedData }, this.persistGraphData);
+    this.setState({ data: updatedData });
   };
 
   render() {
