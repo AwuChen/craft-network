@@ -219,8 +219,7 @@ links:[
     };
     this.state = {
       query: `
-      MATCH (n:Character)-[:INTERACTS1]->(m:Character) 
-      RETURN n.name as source, m.name as target
+      MATCH (u:User)-[r:CONNECTED_TO]->(v:User) RETURN u.name AS source, v.name AS target
       `,
       data: this.loadGraphData()
     };
