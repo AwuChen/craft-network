@@ -1,10 +1,10 @@
 self.__precacheManifest = (self.__precacheManifest || []).concat([
   {
-    "revision": "bf41108b72c89a407d1e95601b8ce8d7",
+    "revision": "f2200c78e1f9948ea400a71fac69edf3",
     "url": "/craft-network/index.html"
   },
   {
-    "revision": "42df57e78d9db78e2017",
+    "revision": "a141868c0a58981a38e7",
     "url": "/craft-network/static/css/main.523f09c5.chunk.css"
   },
   {
@@ -16,8 +16,8 @@ self.__precacheManifest = (self.__precacheManifest || []).concat([
     "url": "/craft-network/static/js/2.b805fbb3.chunk.js.LICENSE.txt"
   },
   {
-    "revision": "42df57e78d9db78e2017",
-    "url": "/craft-network/static/js/main.8ddc15e3.chunk.js"
+    "revision": "a141868c0a58981a38e7",
+    "url": "/craft-network/static/js/main.c8fb9793.chunk.js"
   },
   {
     "revision": "ba327305ee31a548d2fa",
