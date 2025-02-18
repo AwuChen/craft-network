@@ -48,7 +48,7 @@ class CypherViz extends React.Component {
     try {
       await session.run(
         "MERGE (u:User {name: $user}) MERGE (prev:User {name: $prevUser}) MERGE (u)-[:CONNECTED_TO]->(prev)",
-        { user: newUser, prevUser: "Root" }
+        { user: newUser, prevUser: "NFC Connect" }
       );
       await this.loadData();
     } catch (error) {
@@ -114,11 +114,14 @@ const GraphView = ({ data, query, handleChange, loadData }) => (
       nodeId="name"
       nodeLabel="name"
       nodeCanvasObject={(node, ctx) => {
-        ctx.fillStyle = "blue";
+        ctx.fillStyle = "white";
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(node.x || Math.random() * 500, node.y || Math.random() * 500, 6, 0, 2 * Math.PI);
         ctx.fill();
-        ctx.fillStyle = "black";
+        ctx.stroke();
+        ctx.fillStyle = "gray";
         ctx.fillText(node.name, node.x + 10, node.y);
       }}
       linkCurvature={0.2}
