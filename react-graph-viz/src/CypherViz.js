@@ -1,5 +1,5 @@
-import React from 'react';
-import { HashRouter as Router, Route, Routes, useLocation, Navigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { HashRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 import './App.css';
 import ForceGraph2D from 'react-force-graph-2d';
 
@@ -7,15 +7,15 @@ class CypherViz extends React.Component {
   constructor({ driver }) {
     super();
     this.driver = driver;
-
+    
     this.defaultData = {
       nodes: [],
       links: []
     };
+    
     this.state = {
-      query: `
-      MATCH (u:User)-[r:CONNECTED_TO]->(v:User) RETURN u.name AS source, v.name AS target
-      `
+      data: this.defaultData,
+      query: `MATCH (u:User)-[r:CONNECTED_TO]->(v:User) RETURN u.name AS source, v.name AS target`
     };
   }
 
@@ -45,62 +45,87 @@ class CypherViz extends React.Component {
 
   addNodeNFC = async (newUser) => {
     let session = this.driver.session({ database: "neo4j" });
-    await session.run(
-      "MERGE (u:User {name: $user}) MERGE (prev:User {name: $prevUser}) MERGE (u)-[:CONNECTED_TO]->(prev)",
-      { user: newUser, prevUser: this.state.data.nodes[this.state.data.nodes.length - 1]?.name || "Root" }
-    );
+    try {
+      await session.run(
+        "MERGE (u:User {name: $user}) MERGE (prev:User {name: $prevUser}) MERGE (u)-[:CONNECTED_TO]->(prev)",
+        { user: newUser, prevUser: "Root" }
+      );
+      await this.loadData();
+    } catch (error) {
+      console.error("Error adding user:", error);
+    }
     session.close();
-    this.loadData();
+  };
+
+  handleChange = (event) => {
+    this.setState({ query: event.target.value });
   };
 
   render() {
     return (
       <Router>
-        <Routes>
-          <Route path="/NFC" element={<NFCTrigger addNode={this.addNodeNFC} />} />
-          <Route path="/" element={this.renderGraph()} />
-        </Routes>
+        <div>
+          <Routes>
+            <Route path="/NFC" element={<NFCTrigger addNode={this.addNodeNFC} />} />
+            <Route path="/" element={<GraphView data={this.state.data} query={this.state.query} handleChange={this.handleChange} loadData={this.loadData} />} />
+          </Routes>
+        </div>
       </Router>
     );
   }
-
-  renderGraph = () => (
-    <div width="95%">
-      <textarea
-        style={{ display: "block", width: "95%", height: "100px", margin: "0 auto", textAlign: "center"}}
-        value={this.state.query}
-        onChange={(e) => this.setState({ query: e.target.value })} // ✅ Directly updates state
-      />
-      <button id="simulate" onClick={this.loadData}>Simulate</button>
-      <button id="visualize" onClick={() => window.open("https://awuchen.github.io/craft-network-3d/", "_blank")}>Visualize3D</button>
-      <ForceGraph2D
-        graphData={this.state.data}
-        nodeId="name"
-        nodeLabel="name"
-        nodeCanvasObject={(node, ctx) => {
-          ctx.fillStyle = "blue";
-          ctx.beginPath();
-          ctx.arc(node.x || Math.random() * 500, node.y || Math.random() * 500, 6, 0, 2 * Math.PI);
-          ctx.fill();
-          ctx.fillStyle = "black";
-          ctx.fillText(node.name, node.x + 10, node.y);
-        }}
-        linkDirectionalArrowRelPos={1}
-        linkDirectionalArrowLength={5}
-        onNodeClick={node => node.website && window.open(node.website, 'New Window', 'width=500px,height=500px')}
-      />
-    </div>
-  );
 }
 
 const NFCTrigger = ({ addNode }) => {
   const location = useLocation();
+
   React.useEffect(() => {
-    const newUser = `User-${Date.now()}`;
-    addNode(newUser);
+    const addAndRedirect = async () => {
+      const newUser = `User-${Date.now()}`;
+      
+      try {
+        await addNode(newUser);
+      } catch (error) {
+        console.error("Error adding user:", error);
+        return;
+      }
+
+      setTimeout(() => {
+        window.location.assign("/craft-network/#/");
+      }, 1000);
+    };
+
+    addAndRedirect();
   }, [location]);
 
-  return <Navigate to="/" />;
+  return <div style={{ textAlign: "center", padding: "20px", fontSize: "16px", color: "red" }}>Processing NFC tap...</div>;
 };
+
+const GraphView = ({ data, query, handleChange, loadData }) => (
+  <div width="95%">
+    <textarea
+      style={{ display: "block", width: "95%", height: "100px", margin: "0 auto", textAlign: "center" }}
+      value={query}
+      onChange={handleChange}
+    />
+    <button id="simulate" onClick={loadData}>Simulate</button>
+    <button id="visualize" onClick={() => window.open("https://awuchen.github.io/craft-network-3d/", "_blank")}>Visualize3D</button>
+    <ForceGraph2D
+      graphData={data}
+      nodeId="name"
+      nodeLabel="name"
+      nodeCanvasObject={(node, ctx) => {
+        ctx.fillStyle = "blue";
+        ctx.beginPath();
+        ctx.arc(node.x || Math.random() * 500, node.y || Math.random() * 500, 6, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.fillStyle = "black";
+        ctx.fillText(node.name, node.x + 10, node.y);
+      }}
+      linkCurvature={0.2}
+      linkDirectionalArrowRelPos={1}
+      linkDirectionalArrowLength={5}
+    />
+  </div>
+);
 
 export default CypherViz;
