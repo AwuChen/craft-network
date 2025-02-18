@@ -14,7 +14,7 @@
 importScripts("https://storage.googleapis.com/workbox-cdn/releases/4.3.1/workbox-sw.js");
 
 importScripts(
-  "/craft-network/precache-manifest.be11374f510c222fed20533d0818fc00.js"
+  "/craft-network/precache-manifest.820ba5106d3508c8209b2d8747176ef5.js"
 );
 
 self.addEventListener('message', (event) => {
