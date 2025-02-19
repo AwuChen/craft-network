@@ -119,12 +119,13 @@ class CypherViz extends React.Component {
         const GraphView = ({ data, query, handleChange, loadData, fgRef, latestNode }) => (
           <div width="95%">
           <textarea
-          style={{ display: "block", width: "95%", height: "100px", margin: "0 auto", textAlign: "center" }}
+          style={{ display: "block", width: "95%", height: "50px", margin: "0 auto", textAlign: "center" }}
           value={query}
           onChange={handleChange}
           />
           <button id="simulate" onClick={() => loadData()}>Simulate</button>
           <button id="visualize" onClick={() => window.open("https://awuchen.github.io/craft-network-3d/", "_blank")}>Visualize3D</button>
+          <button id="info" onClick={() => window.open("https://www.hako.soooul.xyz/drafts/washi", "_blank")}>Info</button>
           <ForceGraph2D
           ref={fgRef}
           graphData={data}
