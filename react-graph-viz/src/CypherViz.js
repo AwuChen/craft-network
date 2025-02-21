@@ -163,8 +163,8 @@ class CypherViz extends React.Component {
             ref={fgRef}
             graphData={data}
             nodeId="name"
-            nodeLabel="name"
-            onNodeClick={handleNodeClick} // Add click event handler
+            nodeLabel={(node) => node.title || "No Title"} // Ensure a fallback value if role is missing
+            onNodeClick={handleNodeClick}
             nodeCanvasObject={(node, ctx) => {
               ctx.fillStyle = node.name === latestNode ? "black" : "white";
               ctx.strokeStyle = "black";
@@ -174,7 +174,7 @@ class CypherViz extends React.Component {
               ctx.fill();
               ctx.stroke();
               ctx.fillStyle = "gray";
-              ctx.fillText(node.name, node.x + 10, node.y);
+              ctx.fillText(node.role, node.x + 10, node.y);
             }}
             linkCurvature={0.2}
             linkDirectionalArrowRelPos={1}
@@ -193,7 +193,7 @@ class CypherViz extends React.Component {
                 boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.3)",
                 zIndex: 1000
               }}>
-              <h3>Node Information</h3>
+              <h3>Network Info</h3>
               <p><strong>Name:</strong> {selectedNode.name}</p>
               <p><strong>Role:</strong> {selectedNode.role || "N/A"}</p>
               <p><strong>Title:</strong> {selectedNode.title || "N/A"}</p>
@@ -201,7 +201,9 @@ class CypherViz extends React.Component {
               <strong>Website:</strong>{" "}
               {selectedNode.website && selectedNode.website !== "N/A" ? (
                 <a href={selectedNode.website} target="_blank" rel="noopener noreferrer">
-                {selectedNode.website}
+                {selectedNode.website.length > 30 
+                  ? `${selectedNode.website.substring(0, 30)}...`
+                : selectedNode.website}
                 </a>
                 ) : (
                 "N/A"
@@ -210,6 +212,7 @@ class CypherViz extends React.Component {
               <button onClick={() => setSelectedNode(null)}>Close</button>
               </div>
             )}
+
               </div>
               );
             };
