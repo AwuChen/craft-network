@@ -88,14 +88,23 @@ class CypherViz extends React.Component {
     let session = this.driver.session({ database: "neo4j" });
     try {
       await session.run(
-        "MERGE (u:User {name: $user}) MERGE (prev:User {name: $prevUser}) MERGE (u)-[:CONNECTED_TO]->(prev)",
-        { user: newUser, prevUser: "NFC Connection" }
+        `MERGE (u:User {name: $user}) 
+             ON CREATE SET u.role = 'new user', 
+                           u.title = 'TBD', 
+                           u.website = 'https://hako.soooul.xyz/apply/'
+             MERGE (prev:User {name: $prevUser}) 
+                ON CREATE SET prev.role = 'NFC', 
+                           prev.title = 'DEMO', 
+                           prev.website = 'https://www.hako.soooul.xyz/drafts/washi'
+        MERGE (u)-[:CONNECTED_TO]->(prev)`,
+        { user: newUser, prevUser: "WASHI Connection" }
         );
       await this.loadData(newUser);
     } catch (error) {
       console.error("Error adding user:", error);
+    } finally {
+      session.close();
     }
-    session.close();
   };
 
   handleChange = (event) => {
@@ -151,7 +160,7 @@ class CypherViz extends React.Component {
           return (
             <div width="95%">
             <textarea
-            style={{ display: "block", width: "95%", height: "50px", margin: "0 auto", textAlign: "center" }}
+            style={{ display: "block", width: "95%", height: "60px", margin: "0 auto", textAlign: "center" }}
             value={query}
             onChange={handleChange}
             />
