@@ -216,89 +216,98 @@ const saveNodeChanges = async () => {
         website: editedNode.website
       }
       );
-      await loadData(); // Reload the graph data to reflect changes
-      setSelectedNode(editedNode); // Update UI with new data
-    } catch (error) {
-      console.error("Error updating node:", error);
-    } finally {
-      session.close();
-    }
-  };
+    await loadData(); // Reload the graph data to reflect changes
+    setSelectedNode(null); // Automatically close the edit form
+  } catch (error) {
+    console.error("Error updating node:", error);
+  } finally {
+    session.close();
+  }
+};
 
-  return (
-    <div width="95%">
-    <textarea
-    placeholder="Enter query, node name, or title..."
-    style={{ display: "block", width: "95%", height: "60px", margin: "0 auto", textAlign: "center" }}
-    value={inputValue}
-    onChange={handleInputChange}
+return (
+  <div width="95%">
+  <textarea
+  placeholder="Enter query, node name, or title..."
+  style={{ display: "block", width: "95%", height: "60px", margin: "0 auto", textAlign: "center" }}
+  value={inputValue}
+  onChange={handleInputChange}
+  />
+  <button id="simulate" onClick={() => loadData()}>Run</button>
+  <button id="visualize" onClick={() => window.open("https://awuchen.github.io/craft-network-3d/", "_blank")}>Visualize3D</button>
+  <button id="info" onClick={() => window.open("https://www.hako.soooul.xyz/drafts/washi", "_blank")}>Info</button>
+
+  <ForceGraph2D
+  ref={fgRef}
+  graphData={data}
+  nodeId="name"
+  nodeLabel={(node) => node.title || "No Title"}
+  onNodeClick={handleNodeClick}
+  nodeCanvasObject={(node, ctx) => {
+    const isHighlighted =
+    inputValue &&
+    (node.name.toLowerCase().includes(inputValue.toLowerCase()) ||
+    (node.title && node.title.toLowerCase().includes(inputValue.toLowerCase())));
+
+    ctx.fillStyle = node.name === latestNode ? "black" : "white";
+    ctx.strokeStyle = isHighlighted ? "red" : "black";
+    ctx.lineWidth = isHighlighted ? 3 : 2;
+
+    ctx.beginPath();
+    ctx.arc(node.x || Math.random() * 500, node.y || Math.random() * 500, 6, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = "gray";
+    ctx.fillText(node.title, node.x + 10, node.y);
+    }}
+    linkCurvature={0.2}
+    linkDirectionalArrowRelPos={1}
+    linkDirectionalArrowLength={5}
     />
-    <button id="simulate" onClick={() => loadData()}>Run</button>
-    <button id="visualize" onClick={() => window.open("https://awuchen.github.io/craft-network-3d/", "_blank")}>Visualize3D</button>
-    <button id="info" onClick={() => window.open("https://www.hako.soooul.xyz/drafts/washi", "_blank")}>Info</button>
 
-    <ForceGraph2D
-    ref={fgRef}
-    graphData={data}
-    nodeId="name"
-    nodeLabel={(node) => node.title || "No Title"}
-    onNodeClick={handleNodeClick}
-    nodeCanvasObject={(node, ctx) => {
-      const isHighlighted =
-      inputValue &&
-      (node.name.toLowerCase().includes(inputValue.toLowerCase()) ||
-      (node.title && node.title.toLowerCase().includes(inputValue.toLowerCase())));
+    {selectedNode && editedNode && (
+      <div style={{ position: "absolute", top: "20%", left: "50%", transform: "translate(-50%, -50%)", padding: "20px", backgroundColor: "white", border: "1px solid black", boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.3)", zIndex: 1000 }}>
+      {selectedNode.name === latestNode ? (
+        <>
+        <h3>Edit Network Info</h3>
+        <p><strong>Name:</strong>
+        <input name="name" value={editedNode.name} onChange={handleEditChange} /></p>
 
-      ctx.fillStyle = node.name === latestNode ? "black" : "white";
-      ctx.strokeStyle = isHighlighted ? "red" : "black";
-      ctx.lineWidth = isHighlighted ? 3 : 2;
+        <p><strong>Title:</strong>
+        <input name="title" value={editedNode.title} onChange={handleEditChange} /></p>
 
-      ctx.beginPath();
-      ctx.arc(node.x || Math.random() * 500, node.y || Math.random() * 500, 6, 0, 2 * Math.PI);
-      ctx.fill();
-      ctx.stroke();
+        <p><strong>Role:</strong>
+        <input name="role" value={editedNode.role} onChange={handleEditChange} /></p>
 
-      ctx.fillStyle = "gray";
-      ctx.fillText(node.title, node.x + 10, node.y);
-      }}
-      linkCurvature={0.2}
-      linkDirectionalArrowRelPos={1}
-      linkDirectionalArrowLength={5}
-      />
+        <p><strong>Website:</strong>
+        <input name="website" value={editedNode.website} onChange={handleEditChange} /></p>
 
-      {selectedNode && editedNode && (
-        <div style={{ position: "absolute", top: "20%", left: "50%", transform: "translate(-50%, -50%)", padding: "20px", backgroundColor: "white", border: "1px solid black", boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.3)", zIndex: 1000 }}>
-        {selectedNode.name === latestNode ? (
-          <>
-          <h3>Edit Network Info</h3>
-          <p><strong>Name:</strong></p>
-          <input name="name" value={editedNode.name} onChange={handleEditChange} />
-
-          <p><strong>Title:</strong></p>
-          <input name="title" value={editedNode.title} onChange={handleEditChange} />
-
-          <p><strong>Role:</strong></p>
-          <input name="role" value={editedNode.role} onChange={handleEditChange} />
-
-          <p><strong>Website:</strong></p>
-          <input name="website" value={editedNode.website} onChange={handleEditChange} />
-
-          <p><button onClick={saveNodeChanges}>Save Changes</button></p>
-          </>
+        <p><button onClick={saveNodeChanges}>Save Changes</button></p>
+        </>
+        ) : (
+        <>
+        <h3>Network Info</h3>
+        <p><strong>Name:</strong> {selectedNode?.name}</p>
+        <p><strong>Title:</strong> {selectedNode?.title || "N/A"}</p>
+        <p><strong>Role:</strong> {selectedNode?.role || "N/A"}</p>
+        <p><strong>Website:</strong>{" "}
+        {selectedNode.website && selectedNode.website !== "N/A" ? (
+          <a href={selectedNode.website} target="_blank" rel="noopener noreferrer">
+          {selectedNode.website.length > 30 
+            ? `${selectedNode.website.substring(0, 30)}...`
+          : selectedNode.website}
+          </a>
           ) : (
-          <>
-          <h3>Network Info</h3>
-          <p><strong>Name:</strong> {selectedNode.name}</p>
-          <p><strong>Title:</strong> {selectedNode.title || "N/A"}</p>
-          <p><strong>Role:</strong> {selectedNode.role || "N/A"}</p>
-          <p><strong>Website:</strong> {selectedNode.website || "N/A"}</p>
-          </>
-        )}
-        <button onClick={() => setSelectedNode(null)}>Close</button>
-        </div>
+          "N/A"
+        )}</p>
+        </>
       )}
+      <button onClick={() => setSelectedNode(null)}>Close</button>
       </div>
-      );
+    )}
+    </div>
+    );
       };
 
 
