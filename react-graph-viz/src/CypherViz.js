@@ -189,7 +189,7 @@ const NFCTrigger = ({ addNode }) => {
 
       if (matchedNodes.length > 0) {
         const firstMatch = matchedNodes[0];
-        fgRef.current.centerAt(firstMatch.x, firstMatch.y+100, 1500);
+        fgRef.current.centerAt(firstMatch.x, firstMatch.y+80, 1500);
         fgRef.current.zoom(2.5);
       }
     }
