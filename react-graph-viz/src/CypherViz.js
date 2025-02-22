@@ -211,7 +211,13 @@ const handleEditChange = (event) => {
 
 const saveNodeChanges = async () => {
   if (!editedNode || !selectedNode) return;
-  
+
+  // Ensure the website has "https://" if missing
+  let formattedWebsite = editedNode.website.trim();
+  if (formattedWebsite && !formattedWebsite.startsWith("http://") && !formattedWebsite.startsWith("https://")) {
+    formattedWebsite = "https://" + formattedWebsite;
+  }
+
   const session = driver.session();
   try {
     await session.run(
@@ -222,16 +228,18 @@ const saveNodeChanges = async () => {
         newName: editedNode.name,
         role: editedNode.role,
         title: editedNode.title,
-        website: editedNode.website
+        website: formattedWebsite, // Use the corrected website
       }
-      );
+    );
     await loadData(editedNode.name); // Keep the edited node as latestNode
+    setTimeout(() => setSelectedNode(null), 100); // Close the panel after a brief delay
   } catch (error) {
     console.error("Error updating node:", error);
   } finally {
     session.close();
   }
 };
+
 
 return (
   <div width="95%">
