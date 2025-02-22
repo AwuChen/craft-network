@@ -97,24 +97,24 @@ class CypherViz extends React.Component {
          ON CREATE SET nfc.role = 'NFC', 
                        nfc.title = 'DEMO', 
                        nfc.website = 'https://www.hako.soooul.xyz/drafts/washi'
-         
+
          MERGE (awu:User {name: $awuUser}) 
 
          MERGE (u)-[:CONNECTED_TO]->(nfc) 
-         MERGE (nfc)-[:CONNECTED_TO]->(awu)`,
+        MERGE (nfc)-[:CONNECTED_TO]->(awu)`,
         { 
           user: newUser, 
           nfcUser: "NFC Connection", 
           awuUser: "Awu Chen" 
         }
-      );
+        );
       await this.loadData(newUser);
     } catch (error) {
       console.error("Error adding user:", error);
     } finally {
       session.close();
     }
-};
+  };
 
   handleChange = (event) => {
     this.setState({ query: event.target.value });
@@ -225,8 +225,7 @@ const saveNodeChanges = async () => {
         website: editedNode.website
       }
       );
-    await loadData(); // Reload the graph data to reflect changes
-    setSelectedNode(null); // Automatically close the edit form
+    await loadData(editedNode.name); // Keep the edited node as latestNode
   } catch (error) {
     console.error("Error updating node:", error);
   } finally {
@@ -258,7 +257,7 @@ return (
     (node.name.toLowerCase().includes(inputValue.toLowerCase()) ||
     (node.title && node.title.toLowerCase().includes(inputValue.toLowerCase())));
 
-    ctx.fillStyle = node.name === latestNode ? "black" : "white";
+    ctx.fillStyle = node.name === latestNode ? "black" : "white"; // Keep latestNode in black
     ctx.strokeStyle = isHighlighted ? "red" : "black";
     ctx.lineWidth = isHighlighted ? 3 : 2;
 
@@ -269,86 +268,86 @@ return (
 
     ctx.fillStyle = "gray";
     ctx.fillText(node.role, node.x + 10, node.y);
-    }}
-    linkCurvature={0.2}
-    linkDirectionalArrowRelPos={1}
-    linkDirectionalArrowLength={5}
-    />
+  }}
+  linkCurvature={0.2}
+  linkDirectionalArrowRelPos={1}
+  linkDirectionalArrowLength={5}
+  />
 
-    {selectedNode && editedNode && (
-      <div style={{ position: "absolute", top: "20%", left: "50%", transform: "translate(-50%, -50%)", padding: "20px", backgroundColor: "white", border: "1px solid black", boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.3)", zIndex: 1000 }}>
-      {selectedNode.name === latestNode ? (
-        <>
-        <h3>Edit Network Info</h3>
-        <p><strong>Name:</strong>
-        <input 
-        name="name" 
-        value={editedNode.name} 
-        placeholder="Enter name" 
-        onChange={handleEditChange}
-        onFocus={(e) => e.target.placeholder = ""}
-        onBlur={(e) => e.target.placeholder = "Enter name"} 
-        /></p>
+  {selectedNode && editedNode && (
+    <div style={{ position: "absolute", top: "20%", left: "50%", transform: "translate(-50%, -50%)", padding: "20px", backgroundColor: "white", border: "1px solid black", boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.3)", zIndex: 1000 }}>
+    {selectedNode.name === latestNode ? (
+      <>
+      <h3>Edit Network Info</h3>
+      <p><strong>Name:</strong>
+      <input 
+      name="name" 
+      value={editedNode.name} 
+      placeholder="Enter name" 
+      onChange={handleEditChange}
+      onFocus={(e) => e.target.placeholder = ""}
+      onBlur={(e) => e.target.placeholder = "Enter name"} 
+      /></p>
 
-        <p><strong>Title:</strong>
-        <input 
-        name="title" 
-        value={editedNode.title} 
-        placeholder="Enter title" 
-        onChange={handleEditChange}
-        onFocus={(e) => e.target.placeholder = ""}
-        onBlur={(e) => e.target.placeholder = "Enter title"} 
-        /></p>
+      <p><strong>Title:</strong>
+      <input 
+      name="title" 
+      value={editedNode.title} 
+      placeholder="Enter title" 
+      onChange={handleEditChange}
+      onFocus={(e) => e.target.placeholder = ""}
+      onBlur={(e) => e.target.placeholder = "Enter title"} 
+      /></p>
 
-        <p><strong>Role:</strong>
-        <input 
-        name="role" 
-        value={editedNode.role} 
-        placeholder="Enter role" 
-        onChange={handleEditChange}
-        onFocus={(e) => e.target.placeholder = ""}
-        onBlur={(e) => e.target.placeholder = "Enter role"} 
-        /></p>
+      <p><strong>Role:</strong>
+      <input 
+      name="role" 
+      value={editedNode.role} 
+      placeholder="Enter role" 
+      onChange={handleEditChange}
+      onFocus={(e) => e.target.placeholder = ""}
+      onBlur={(e) => e.target.placeholder = "Enter role"} 
+      /></p>
 
-        <p><strong>Website:</strong>
-        <input 
-        name="website" 
-        value={editedNode.website} 
-        placeholder="Enter website" 
-        onChange={handleEditChange}
-        onFocus={(e) => e.target.placeholder = ""}
-        onBlur={(e) => e.target.placeholder = "Enter website"} 
-        /></p>
+      <p><strong>Website:</strong>
+      <input 
+      name="website" 
+      value={editedNode.website} 
+      placeholder="Enter website" 
+      onChange={handleEditChange}
+      onFocus={(e) => e.target.placeholder = ""}
+      onBlur={(e) => e.target.placeholder = "Enter website"} 
+      /></p>
 
-        <p><button onClick={saveNodeChanges}>Save</button></p>
-        </>
+      <p><button onClick={saveNodeChanges}>Save</button></p>
+      </>
+      ) : (
+      <>
+      <h3>Network Info</h3>
+      <p><strong>Name:</strong> {selectedNode?.name}</p>
+      <p><strong>Title:</strong> {selectedNode?.title}</p>
+      <p><strong>Role:</strong> {selectedNode?.role}</p>
+      <p><strong>Website:</strong>{" "}
+      {selectedNode.website && selectedNode.website !== "" ? (
+        <a href={selectedNode.website} target="_blank" rel="noopener noreferrer">
+        {selectedNode.website.length > 30 
+          ? `${selectedNode.website.substring(0, 30)}...`
+        : selectedNode.website}
+        </a>
         ) : (
-        <>
-        <h3>Network Info</h3>
-        <p><strong>Name:</strong> {selectedNode?.name}</p>
-        <p><strong>Title:</strong> {selectedNode?.title}</p>
-        <p><strong>Role:</strong> {selectedNode?.role}</p>
-        <p><strong>Website:</strong>{" "}
-        {selectedNode.website && selectedNode.website !== "" ? (
-          <a href={selectedNode.website} target="_blank" rel="noopener noreferrer">
-          {selectedNode.website.length > 30 
-            ? `${selectedNode.website.substring(0, 30)}...`
-          : selectedNode.website}
-          </a>
-          ) : (
-          ""
-        )}</p>
-        </>
-      )}
-      <button onClick={() => setSelectedNode(null)}>Close</button>
-      </div>
+        ""
+      )}</p>
+      </>
     )}
+    <button onClick={() => setSelectedNode(null)}>Close</button>
     </div>
-    );
-      };
+  )}
+  </div>
+  );
+    };
 
 
 
 
 
-      export default CypherViz;
+    export default CypherViz;
