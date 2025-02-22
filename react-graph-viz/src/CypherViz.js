@@ -38,9 +38,9 @@ class CypherViz extends React.Component {
       if (!nodesMap.has(source)) {
         nodesMap.set(source, {
           name: source,
-          role: r.get("sourceRole") || "N/A",
-          title: r.get("sourceTitle") || "N/A",
-          website: r.get("sourceWebsite") || "N/A",
+          role: r.get("sourceRole"),
+          title: r.get("sourceTitle"),
+          website: r.get("sourceWebsite"),
           x: Math.random() * 500,
           y: Math.random() * 500
         });
@@ -50,9 +50,9 @@ class CypherViz extends React.Component {
       if (!nodesMap.has(target)) {
         nodesMap.set(target, {
           name: target,
-          role: r.get("targetRole") || "N/A",
-          title: r.get("targetTitle") || "N/A",
-          website: r.get("targetWebsite") || "N/A",
+          role: r.get("targetRole"),
+          title: r.get("targetTitle"),
+          website: r.get("targetWebsite"),
           x: Math.random() * 500,
           y: Math.random() * 500
         });
@@ -89,23 +89,32 @@ class CypherViz extends React.Component {
     try {
       await session.run(
         `MERGE (u:User {name: $user}) 
-             ON CREATE SET u.role = 'new user', 
-                           u.title = 'TBD', 
-                           u.website = 'https://hako.soooul.xyz/apply/'
-             MERGE (prev:User {name: $prevUser}) 
-                ON CREATE SET prev.role = 'NFC', 
-                           prev.title = 'DEMO', 
-                           prev.website = 'https://www.hako.soooul.xyz/drafts/washi'
-        MERGE (u)-[:CONNECTED_TO]->(prev)`,
-        { user: newUser, prevUser: "WASHI Connection" }
-        );
+         ON CREATE SET u.role = 'new user', 
+                       u.title = '', 
+                       u.website = ''
+
+         MERGE (nfc:User {name: $nfcUser}) 
+         ON CREATE SET nfc.role = 'NFC', 
+                       nfc.title = 'DEMO', 
+                       nfc.website = 'https://www.hako.soooul.xyz/drafts/washi'
+         
+         MERGE (awu:User {name: $awuUser}) 
+
+         MERGE (u)-[:CONNECTED_TO]->(nfc) 
+         MERGE (nfc)-[:CONNECTED_TO]->(awu)`,
+        { 
+          user: newUser, 
+          nfcUser: "NFC Connection", 
+          awuUser: "Awu Chen" 
+        }
+      );
       await this.loadData(newUser);
     } catch (error) {
       console.error("Error adding user:", error);
     } finally {
       session.close();
     }
-  };
+};
 
   handleChange = (event) => {
     this.setState({ query: event.target.value });
@@ -259,7 +268,7 @@ return (
     ctx.stroke();
 
     ctx.fillStyle = "gray";
-    ctx.fillText(node.title, node.x + 10, node.y);
+    ctx.fillText(node.role, node.x + 10, node.y);
     }}
     linkCurvature={0.2}
     linkDirectionalArrowRelPos={1}
@@ -272,34 +281,62 @@ return (
         <>
         <h3>Edit Network Info</h3>
         <p><strong>Name:</strong>
-        <input name="name" value={editedNode.name} onChange={handleEditChange} /></p>
+        <input 
+        name="name" 
+        value={editedNode.name} 
+        placeholder="Enter name" 
+        onChange={handleEditChange}
+        onFocus={(e) => e.target.placeholder = ""}
+        onBlur={(e) => e.target.placeholder = "Enter name"} 
+        /></p>
 
         <p><strong>Title:</strong>
-        <input name="title" value={editedNode.title} onChange={handleEditChange} /></p>
+        <input 
+        name="title" 
+        value={editedNode.title} 
+        placeholder="Enter title" 
+        onChange={handleEditChange}
+        onFocus={(e) => e.target.placeholder = ""}
+        onBlur={(e) => e.target.placeholder = "Enter title"} 
+        /></p>
 
         <p><strong>Role:</strong>
-        <input name="role" value={editedNode.role} onChange={handleEditChange} /></p>
+        <input 
+        name="role" 
+        value={editedNode.role} 
+        placeholder="Enter role" 
+        onChange={handleEditChange}
+        onFocus={(e) => e.target.placeholder = ""}
+        onBlur={(e) => e.target.placeholder = "Enter role"} 
+        /></p>
 
         <p><strong>Website:</strong>
-        <input name="website" value={editedNode.website} onChange={handleEditChange} /></p>
+        <input 
+        name="website" 
+        value={editedNode.website} 
+        placeholder="Enter website" 
+        onChange={handleEditChange}
+        onFocus={(e) => e.target.placeholder = ""}
+        onBlur={(e) => e.target.placeholder = "Enter website"} 
+        /></p>
 
-        <p><button onClick={saveNodeChanges}>Save Changes</button></p>
+        <p><button onClick={saveNodeChanges}>Save</button></p>
         </>
         ) : (
         <>
         <h3>Network Info</h3>
         <p><strong>Name:</strong> {selectedNode?.name}</p>
-        <p><strong>Title:</strong> {selectedNode?.title || "N/A"}</p>
-        <p><strong>Role:</strong> {selectedNode?.role || "N/A"}</p>
+        <p><strong>Title:</strong> {selectedNode?.title}</p>
+        <p><strong>Role:</strong> {selectedNode?.role}</p>
         <p><strong>Website:</strong>{" "}
-        {selectedNode.website && selectedNode.website !== "N/A" ? (
+        {selectedNode.website && selectedNode.website !== "" ? (
           <a href={selectedNode.website} target="_blank" rel="noopener noreferrer">
           {selectedNode.website.length > 30 
             ? `${selectedNode.website.substring(0, 30)}...`
           : selectedNode.website}
           </a>
           ) : (
-          "N/A"
+          ""
         )}</p>
         </>
       )}
