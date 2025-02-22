@@ -71,10 +71,10 @@ class CypherViz extends React.Component {
           let newNode = nodes.find(n => n.name === newNodeName);
           if (newNode && this.fgRef.current) {
             console.log("Focusing on:", newNode);
-            this.fgRef.current.centerAt(newNode.x, newNode.y, 1000);
-            this.fgRef.current.zoom(1.5);
+            this.fgRef.current.centerAt(newNode.x, newNode.y, 1500);
+            this.fgRef.current.zoom(1.25);
           }
-        }, 1500);
+        }, 2000);
       }
     });
   };
@@ -150,81 +150,116 @@ class CypherViz extends React.Component {
           return <div style={{ textAlign: "center", padding: "20px", fontSize: "16px", color: "red" }}>Processing NFC tap...</div>;
         };
 
-        const GraphView = ({ data, query, handleChange, loadData, fgRef, latestNode }) => {
-          const [selectedNode, setSelectedNode] = useState(null);
+        const GraphView = ({ data, handleChange, loadData, fgRef, latestNode }) => {
+  const [inputValue, setInputValue] = useState(""); // Keep input empty initially
+  const [selectedNode, setSelectedNode] = useState(null);
 
-          const handleNodeClick = (node) => {
-            setSelectedNode(node);
-          };
+  const handleInputChange = (event) => {
+    const input = event.target.value;
+    setInputValue(input);
+    handleChange(event); // Update query state (even if blank)
 
-          return (
-            <div width="95%">
-            <textarea
-            style={{ display: "block", width: "95%", height: "60px", margin: "0 auto", textAlign: "center" }}
-            value={query}
-            onChange={handleChange}
-            />
-            <button id="simulate" onClick={() => loadData()}>Simulate</button>
-            <button id="visualize" onClick={() => window.open("https://awuchen.github.io/craft-network-3d/", "_blank")}>Visualize3D</button>
-            <button id="info" onClick={() => window.open("https://www.hako.soooul.xyz/drafts/washi", "_blank")}>Info</button>
+    const isCypherQuery = /\b(MATCH|RETURN|WHERE|SET|CREATE|MERGE|DELETE)\b/i.test(input);
 
-            <ForceGraph2D
-            ref={fgRef}
-            graphData={data}
-            nodeId="name"
-            nodeLabel={(node) => node.title || "No Title"} // Ensure a fallback value if role is missing
-            onNodeClick={handleNodeClick}
-            nodeCanvasObject={(node, ctx) => {
-              ctx.fillStyle = node.name === latestNode ? "black" : "white";
-              ctx.strokeStyle = "black";
-              ctx.lineWidth = 2;
-              ctx.beginPath();
-              ctx.arc(node.x || Math.random() * 500, node.y || Math.random() * 500, 6, 0, 2 * Math.PI);
-              ctx.fill();
-              ctx.stroke();
-              ctx.fillStyle = "gray";
-              ctx.fillText(node.role, node.x + 10, node.y);
-            }}
-            linkCurvature={0.2}
-            linkDirectionalArrowRelPos={1}
-            linkDirectionalArrowLength={5}
-            />
+    if (!isCypherQuery && fgRef.current) {
+      // Search for nodes matching name OR title
+      const matchedNodes = data.nodes.filter(
+        (node) =>
+        node.name.toLowerCase().includes(input.toLowerCase()) ||
+        (node.title && node.title.toLowerCase().includes(input.toLowerCase()))
+        );
 
-            {selectedNode && (
-              <div style={{
-                position: "absolute",
-                top: "20%",
-                left: "50%",
-                transform: "translate(-50%, -50%)",
-                padding: "20px",
-                backgroundColor: "white",
-                border: "1px solid black",
-                boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.3)",
-                zIndex: 1000
-              }}>
-              <h3>Network Info</h3>
-              <p><strong>Name:</strong> {selectedNode.name}</p>
-              <p><strong>Role:</strong> {selectedNode.role || "N/A"}</p>
-              <p><strong>Title:</strong> {selectedNode.title || "N/A"}</p>
-              <p>
-              <strong>Website:</strong>{" "}
-              {selectedNode.website && selectedNode.website !== "N/A" ? (
-                <a href={selectedNode.website} target="_blank" rel="noopener noreferrer">
-                {selectedNode.website.length > 30 
-                  ? `${selectedNode.website.substring(0, 30)}...`
-                : selectedNode.website}
-                </a>
-                ) : (
-                "N/A"
-              )}
-              </p>
-              <button onClick={() => setSelectedNode(null)}>Close</button>
-              </div>
-            )}
+      if (matchedNodes.length > 0) {
+        const firstMatch = matchedNodes[0]; // Zoom into first matching node
+        fgRef.current.centerAt(firstMatch.x, firstMatch.y+100, 1500);
+        fgRef.current.zoom(2.5);
+      }
+    }
+  };
 
-              </div>
-              );
-            };
+  const handleNodeClick = (node) => {
+    setSelectedNode(node);
+  };
+
+  return (
+    <div width="95%">
+    <textarea
+    placeholder="Enter query, node name, or title..."
+    style={{ display: "block", width: "95%", height: "60px", margin: "0 auto", textAlign: "center" }}
+        value={inputValue} // Starts empty
+        onChange={handleInputChange}
+        />
+        <button id="simulate" onClick={() => loadData()}>Run</button>
+        <button id="visualize" onClick={() => window.open("https://awuchen.github.io/craft-network-3d/", "_blank")}>Visualize3D</button>
+        <button id="info" onClick={() => window.open("https://www.hako.soooul.xyz/drafts/washi", "_blank")}>Info</button>
+
+        <ForceGraph2D
+        ref={fgRef}
+        graphData={data}
+        nodeId="name"
+        nodeLabel={(node) => node.title || "No Title"}
+        onNodeClick={handleNodeClick}
+        nodeCanvasObject={(node, ctx) => {
+          const isHighlighted =
+          inputValue &&
+          (node.name.toLowerCase().includes(inputValue.toLowerCase()) ||
+          (node.title && node.title.toLowerCase().includes(inputValue.toLowerCase())));
+
+          // Draw the node
+          ctx.fillStyle = node.name === latestNode ? "black" : "white";
+          ctx.strokeStyle = isHighlighted ? "red" : "black"; // Highlight if name or title matches
+          ctx.lineWidth = isHighlighted ? 3 : 2;
+          
+          ctx.beginPath();
+          ctx.arc(node.x || Math.random() * 500, node.y || Math.random() * 500, 6, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.stroke();
+
+          // Display text (role)
+          ctx.fillStyle = "gray";
+          ctx.fillText(node.role, node.x + 10, node.y);
+        }}
+        linkCurvature={0.2}
+        linkDirectionalArrowRelPos={1}
+        linkDirectionalArrowLength={5}
+        />
+
+        {selectedNode && (
+          <div style={{
+            position: "absolute",
+            top: "20%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            padding: "20px",
+            backgroundColor: "white",
+            border: "1px solid black",
+            boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.3)",
+            zIndex: 1000
+          }}>
+          <h3>Network Info</h3>
+          <p><strong>Name:</strong> {selectedNode.name}</p>
+          <p><strong>Title:</strong> {selectedNode.title || "N/A"}</p>
+          <p><strong>Role:</strong> {selectedNode.role || "N/A"}</p>
+          <p>
+          <strong>Website:</strong>{" "}
+          {selectedNode.website && selectedNode.website !== "N/A" ? (
+            <a href={selectedNode.website} target="_blank" rel="noopener noreferrer">
+            {selectedNode.website.length > 30 
+              ? `${selectedNode.website.substring(0, 30)}...`
+            : selectedNode.website}
+            </a>
+            ) : (
+            "N/A"
+          )}
+          </p>
+          <button onClick={() => setSelectedNode(null)}>Close</button>
+          </div>
+        )}
+          </div>
+          );
+        };
 
 
-            export default CypherViz;
+
+
+        export default CypherViz;
