@@ -117,42 +117,52 @@ class CypherViz extends React.Component {
       <div>
       <Routes>
       <Route path="/NFC" element={<NFCTrigger addNode={this.addNodeNFC} />} />
-      <Route path="/" element={<GraphView data={this.state.data} query={this.state.query} handleChange={this.handleChange} loadData={this.loadData} fgRef={this.fgRef} latestNode={this.state.latestNode} />} />
-      </Routes>
-      </div>
-      </Router>
-      );
-    }
-  }
+      <Route path="/" element={
+        <GraphView 
+        data={this.state.data} 
+        handleChange={this.handleChange} 
+        loadData={this.loadData} 
+        fgRef={this.fgRef} 
+        latestNode={this.state.latestNode} 
+    driver={this.driver} // Pass the driver
+    />
+  } />
+  </Routes>
+  </div>
+  </Router>
+  );
+}
+}
 
-  const NFCTrigger = ({ addNode }) => {
-    const location = useLocation();
+const NFCTrigger = ({ addNode }) => {
+  const location = useLocation();
 
-    React.useEffect(() => {
-      const addAndRedirect = async () => {
-        const newUser = `User-${Date.now()}`;
+  React.useEffect(() => {
+    const addAndRedirect = async () => {
+      const newUser = `User-${Date.now()}`;
 
-        try {
-          await addNode(newUser);
-          } catch (error) {
-            console.error("Error adding user:", error);
-            return;
-          }
+      try {
+        await addNode(newUser);
+        } catch (error) {
+          console.error("Error adding user:", error);
+          return;
+        }
 
-          setTimeout(() => {
-            window.location.assign("/craft-network/#/");
-            }, 1000);
-          };
-
-          addAndRedirect();
-          }, [location]);
-
-          return <div style={{ textAlign: "center", padding: "20px", fontSize: "16px", color: "red" }}>Processing NFC tap...</div>;
+        setTimeout(() => {
+          window.location.assign("/craft-network/#/");
+          }, 1000);
         };
 
-        const GraphView = ({ data, handleChange, loadData, fgRef, latestNode }) => {
+        addAndRedirect();
+        }, [location]);
+
+        return <div style={{ textAlign: "center", padding: "20px", fontSize: "16px", color: "red" }}>Processing NFC tap...</div>;
+      };
+
+      const GraphView = ({ data, handleChange, loadData, fgRef, latestNode, driver }) => {
   const [inputValue, setInputValue] = useState(""); // Keep input empty initially
   const [selectedNode, setSelectedNode] = useState(null);
+  const [editedNode, setEditedNode] = useState(null); // Stores edited node details
 
   const handleInputChange = (event) => {
     const input = event.target.value;
@@ -162,7 +172,6 @@ class CypherViz extends React.Component {
     const isCypherQuery = /\b(MATCH|RETURN|WHERE|SET|CREATE|MERGE|DELETE)\b/i.test(input);
 
     if (!isCypherQuery && fgRef.current) {
-      // Search for nodes matching name OR title
       const matchedNodes = data.nodes.filter(
         (node) =>
         node.name.toLowerCase().includes(input.toLowerCase()) ||
@@ -170,7 +179,7 @@ class CypherViz extends React.Component {
         );
 
       if (matchedNodes.length > 0) {
-        const firstMatch = matchedNodes[0]; // Zoom into first matching node
+        const firstMatch = matchedNodes[0];
         fgRef.current.centerAt(firstMatch.x, firstMatch.y+100, 1500);
         fgRef.current.zoom(2.5);
       }
@@ -178,7 +187,42 @@ class CypherViz extends React.Component {
   };
 
   const handleNodeClick = (node) => {
-    setSelectedNode(node);
+  if (!node) return; // Prevent errors if node is null
+  setSelectedNode(node);
+  setEditedNode({ ...node }); // Clone the selected node for editing
+};
+
+const handleEditChange = (event) => {
+  const { name, value } = event.target;
+  setEditedNode((prev) => ({
+    ...prev,
+    [name]: value,
+  }));
+};
+
+const saveNodeChanges = async () => {
+  if (!editedNode || !selectedNode) return;
+  
+  const session = driver.session();
+  try {
+    await session.run(
+      `MATCH (u:User {name: $oldName}) 
+      SET u.name = $newName, u.role = $role, u.title = $title, u.website = $website`,
+      {
+        oldName: selectedNode.name,
+        newName: editedNode.name,
+        role: editedNode.role,
+        title: editedNode.title,
+        website: editedNode.website
+      }
+      );
+      await loadData(); // Reload the graph data to reflect changes
+      setSelectedNode(editedNode); // Update UI with new data
+    } catch (error) {
+      console.error("Error updating node:", error);
+    } finally {
+      session.close();
+    }
   };
 
   return (
@@ -186,80 +230,79 @@ class CypherViz extends React.Component {
     <textarea
     placeholder="Enter query, node name, or title..."
     style={{ display: "block", width: "95%", height: "60px", margin: "0 auto", textAlign: "center" }}
-        value={inputValue} // Starts empty
-        onChange={handleInputChange}
-        />
-        <button id="simulate" onClick={() => loadData()}>Run</button>
-        <button id="visualize" onClick={() => window.open("https://awuchen.github.io/craft-network-3d/", "_blank")}>Visualize3D</button>
-        <button id="info" onClick={() => window.open("https://www.hako.soooul.xyz/drafts/washi", "_blank")}>Info</button>
+    value={inputValue}
+    onChange={handleInputChange}
+    />
+    <button id="simulate" onClick={() => loadData()}>Run</button>
+    <button id="visualize" onClick={() => window.open("https://awuchen.github.io/craft-network-3d/", "_blank")}>Visualize3D</button>
+    <button id="info" onClick={() => window.open("https://www.hako.soooul.xyz/drafts/washi", "_blank")}>Info</button>
 
-        <ForceGraph2D
-        ref={fgRef}
-        graphData={data}
-        nodeId="name"
-        nodeLabel={(node) => node.title || "No Title"}
-        onNodeClick={handleNodeClick}
-        nodeCanvasObject={(node, ctx) => {
-          const isHighlighted =
-          inputValue &&
-          (node.name.toLowerCase().includes(inputValue.toLowerCase()) ||
-          (node.title && node.title.toLowerCase().includes(inputValue.toLowerCase())));
+    <ForceGraph2D
+    ref={fgRef}
+    graphData={data}
+    nodeId="name"
+    nodeLabel={(node) => node.title || "No Title"}
+    onNodeClick={handleNodeClick}
+    nodeCanvasObject={(node, ctx) => {
+      const isHighlighted =
+      inputValue &&
+      (node.name.toLowerCase().includes(inputValue.toLowerCase()) ||
+      (node.title && node.title.toLowerCase().includes(inputValue.toLowerCase())));
 
-          // Draw the node
-          ctx.fillStyle = node.name === latestNode ? "black" : "white";
-          ctx.strokeStyle = isHighlighted ? "red" : "black"; // Highlight if name or title matches
-          ctx.lineWidth = isHighlighted ? 3 : 2;
-          
-          ctx.beginPath();
-          ctx.arc(node.x || Math.random() * 500, node.y || Math.random() * 500, 6, 0, 2 * Math.PI);
-          ctx.fill();
-          ctx.stroke();
+      ctx.fillStyle = node.name === latestNode ? "black" : "white";
+      ctx.strokeStyle = isHighlighted ? "red" : "black";
+      ctx.lineWidth = isHighlighted ? 3 : 2;
 
-          // Display text (role)
-          ctx.fillStyle = "gray";
-          ctx.fillText(node.role, node.x + 10, node.y);
-        }}
-        linkCurvature={0.2}
-        linkDirectionalArrowRelPos={1}
-        linkDirectionalArrowLength={5}
-        />
+      ctx.beginPath();
+      ctx.arc(node.x || Math.random() * 500, node.y || Math.random() * 500, 6, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.stroke();
 
-        {selectedNode && (
-          <div style={{
-            position: "absolute",
-            top: "20%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            padding: "20px",
-            backgroundColor: "white",
-            border: "1px solid black",
-            boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.3)",
-            zIndex: 1000
-          }}>
+      ctx.fillStyle = "gray";
+      ctx.fillText(node.title, node.x + 10, node.y);
+      }}
+      linkCurvature={0.2}
+      linkDirectionalArrowRelPos={1}
+      linkDirectionalArrowLength={5}
+      />
+
+      {selectedNode && editedNode && (
+        <div style={{ position: "absolute", top: "20%", left: "50%", transform: "translate(-50%, -50%)", padding: "20px", backgroundColor: "white", border: "1px solid black", boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.3)", zIndex: 1000 }}>
+        {selectedNode.name === latestNode ? (
+          <>
+          <h3>Edit Network Info</h3>
+          <p><strong>Name:</strong></p>
+          <input name="name" value={editedNode.name} onChange={handleEditChange} />
+
+          <p><strong>Title:</strong></p>
+          <input name="title" value={editedNode.title} onChange={handleEditChange} />
+
+          <p><strong>Role:</strong></p>
+          <input name="role" value={editedNode.role} onChange={handleEditChange} />
+
+          <p><strong>Website:</strong></p>
+          <input name="website" value={editedNode.website} onChange={handleEditChange} />
+
+          <p><button onClick={saveNodeChanges}>Save Changes</button></p>
+          </>
+          ) : (
+          <>
           <h3>Network Info</h3>
           <p><strong>Name:</strong> {selectedNode.name}</p>
           <p><strong>Title:</strong> {selectedNode.title || "N/A"}</p>
           <p><strong>Role:</strong> {selectedNode.role || "N/A"}</p>
-          <p>
-          <strong>Website:</strong>{" "}
-          {selectedNode.website && selectedNode.website !== "N/A" ? (
-            <a href={selectedNode.website} target="_blank" rel="noopener noreferrer">
-            {selectedNode.website.length > 30 
-              ? `${selectedNode.website.substring(0, 30)}...`
-            : selectedNode.website}
-            </a>
-            ) : (
-            "N/A"
-          )}
-          </p>
-          <button onClick={() => setSelectedNode(null)}>Close</button>
-          </div>
+          <p><strong>Website:</strong> {selectedNode.website || "N/A"}</p>
+          </>
         )}
-          </div>
-          );
-        };
+        <button onClick={() => setSelectedNode(null)}>Close</button>
+        </div>
+      )}
+      </div>
+      );
+      };
 
 
 
 
-        export default CypherViz;
+
+      export default CypherViz;
