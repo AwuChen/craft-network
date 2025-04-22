@@ -89,14 +89,14 @@ class CypherViz extends React.Component {
     try {
       await session.run(
         `MERGE (u:User {name: $user}) 
-         ON CREATE SET u.role = 'researcher', 
+         ON CREATE SET u.role = 'attendee', 
                        u.title = '', 
                        u.website = ''
 
          MERGE (nfc:User {name: $nfcUser}) 
-         ON CREATE SET nfc.role = 'Craft Workshop', 
-                       nfc.title = 'Researchers', 
-                       nfc.website = 'https://yamauchi.net/craft-2025/'
+         ON CREATE SET nfc.role = 'Osaka Expo', 
+                       nfc.title = 'Expo 2025', 
+                       nfc.website = 'https://www.expo2025.or.jp/en/'
 
          MERGE (awu:User {name: $awuUser}) 
 
@@ -104,7 +104,7 @@ class CypherViz extends React.Component {
         MERGE (nfc)-[:CONNECTED_TO]->(awu)`,
         { 
           user: newUser, 
-          nfcUser: "Kyoto Craft Workshop", 
+          nfcUser: "Osaka World Expo", 
           awuUser: "Awu Chen" 
         }
         );
