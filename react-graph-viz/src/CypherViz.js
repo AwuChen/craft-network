@@ -227,9 +227,18 @@ const NFCTrigger = ({ addNode }) => {
             handleChange({ target: { value: generatedQuery } });
 
             await loadData(null, generatedQuery);
-          } catch (error) {
-            console.error("Flowise call failed:", error);
-          }
+
+            // Then reload the full graph with your default MATCH query
+            const defaultQuery = `
+              MATCH (u:User)-[r:CONNECTED_TO]->(v:User)
+              RETURN u.name AS source, u.role AS sourceRole, u.title AS sourceTitle, u.website AS sourceWebsite, 
+                     v.name AS target, v.role AS targetRole, v.title AS targetTitle, v.website AS targetWebsite
+            `;
+            await loadData(null, defaultQuery);
+            
+            } catch (error) {
+              console.error("Flowise call failed:", error);
+            }
         };
 
         const handleNodeClick = (node) => {
