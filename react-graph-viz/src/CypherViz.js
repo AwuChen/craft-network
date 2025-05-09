@@ -278,7 +278,7 @@ const NFCTrigger = ({ addNode }) => {
               }
             );
             await loadData(editedNode.name); // Keep the edited node as latestNode
-            setTimeout(() => setSelectedNode(null), 100); // Close the panel after a brief delay
+            setSelectedNode; // Close the panel
           } catch (error) {
             console.error("Error updating node:", error);
           } finally {
