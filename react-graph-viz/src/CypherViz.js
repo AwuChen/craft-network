@@ -196,6 +196,12 @@ const NFCTrigger = ({ addNode }) => {
             handleChange({ target: { value: generatedQuery } });
 
             await loadData(null, generatedQuery);
+
+            // Soft reset the graph view
+            if (fgRef.current) {
+              fgRef.current.zoomToFit(400); // duration in ms
+              fgRef.current.centerAt(0, 0, 400); // optional: re-center
+            }
           } catch (error) {
             console.error("Flowise call failed:", error);
           }
