@@ -182,20 +182,23 @@ const NFCTrigger = ({ addNode }) => {
         const handleSubmit = async (e) => {
           e.preventDefault();
 
-          // Send natural language to Flowise
-          setInputValue(generatedQuery); // sync textarea
-          const response = await fetch('/api/flowise', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: inputValue })
-          });
+          try {
+            const response = await fetch("https://flowise-hako.onrender.com/api/v1/prediction/29e305b3-c569-4676-a454-1c4fdc380c69", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ question: inputValue })
+            });
 
-          const data = await response.json();
-          const generatedQuery = data.query; // Assuming Flowise returns { query: "..." }
+            const data = await response.json();
+            const generatedQuery = data.text || data.query || "";
 
-          handleChange({ target: { value: generatedQuery }}); // updates CypherViz.query
+            setInputValue(generatedQuery);
+            handleChange({ target: { value: generatedQuery } });
 
-          await loadData(null, generatedQuery); // pass query directly
+            await loadData(null, generatedQuery);
+          } catch (error) {
+            console.error("Flowise call failed:", error);
+          }
         };
 
         const handleNodeClick = (node) => {
