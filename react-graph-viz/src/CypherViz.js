@@ -26,39 +26,69 @@ class CypherViz extends React.Component {
 
   loadData = async (newNodeName = null, queryOverride = null) => {
     let session = this.driver.session({ database: "neo4j" });
-    let res = await session.run(queryOverride || this.state.query);
-    session.close();
+    let res;
+    try {
+      res = await session.run(queryOverride || this.state.query);
+    } catch (err) {
+      console.error("Neo4j query failed:", err);
+      this.setState({ data: { nodes: [], links: [] } });
+      return;
+    } finally {
+      session.close();
+    }
 
     let nodesMap = new Map();
-    let links = res.records.map(r => {
-      let source = r.get("source");
-      let target = r.get("target");
+    let links = [];
 
-    // Add or update source node
-      if (!nodesMap.has(source)) {
-        nodesMap.set(source, {
-          name: source,
-          role: r.get("sourceRole"),
-          title: r.get("sourceTitle"),
-          website: r.get("sourceWebsite"),
-          x: Math.random() * 500,
-          y: Math.random() * 500
+    // Intelligent parser
+    res.records.forEach((record) => {
+      if (record.has("source") && record.has("target")) {
+        // standard case
+        let source = record.get("source");
+        let target = record.get("target");
+
+        if (!nodesMap.has(source)) {
+          nodesMap.set(source, {
+            name: source,
+            role: record.get("sourceRole"),
+            title: record.get("sourceTitle"),
+            website: record.get("sourceWebsite"),
+            x: Math.random() * 500,
+            y: Math.random() * 500,
+          });
+        }
+
+        if (!nodesMap.has(target)) {
+          nodesMap.set(target, {
+            name: target,
+            role: record.get("targetRole"),
+            title: record.get("targetTitle"),
+            website: record.get("targetWebsite"),
+            x: Math.random() * 500,
+            y: Math.random() * 500,
+          });
+        }
+
+        links.push({ source, target });
+      } else {
+        // fallback: node-only query
+        record.keys.forEach((key) => {
+          const node = record.get(key);
+          if (node.properties && node.identity) {
+            const name = node.properties.name || `Node-${node.identity.low}`;
+            if (!nodesMap.has(name)) {
+              nodesMap.set(name, {
+                name,
+                role: node.properties.role || "",
+                title: node.properties.title || "",
+                website: node.properties.website || "",
+                x: Math.random() * 500,
+                y: Math.random() * 500,
+              });
+            }
+          }
         });
       }
-
-    // Add or update target node
-      if (!nodesMap.has(target)) {
-        nodesMap.set(target, {
-          name: target,
-          role: r.get("targetRole"),
-          title: r.get("targetTitle"),
-          website: r.get("targetWebsite"),
-          x: Math.random() * 500,
-          y: Math.random() * 500
-        });
-      }
-
-      return { source, target };
     });
 
     const nodes = Array.from(nodesMap.values());
@@ -68,7 +98,7 @@ class CypherViz extends React.Component {
     this.setState({ data: updatedData, latestNode: newNodeName }, () => {
       if (newNodeName) {
         setTimeout(() => {
-          let newNode = nodes.find(n => n.name === newNodeName);
+          let newNode = nodes.find((n) => n.name === newNodeName);
           if (newNode && this.fgRef.current) {
             console.log("Focusing on:", newNode);
             this.fgRef.current.centerAt(newNode.x, newNode.y, 1500);
@@ -78,6 +108,7 @@ class CypherViz extends React.Component {
       }
     });
   };
+
 
 
   componentDidMount() {
