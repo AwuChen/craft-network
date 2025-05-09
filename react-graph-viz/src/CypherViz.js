@@ -183,21 +183,36 @@ const NFCTrigger = ({ addNode }) => {
           e.preventDefault();
 
           try {
-            const response = await fetch("https://flowise-hako.onrender.com/api/v1/prediction/29e305b3-c569-4676-a454-1c4fdc380c69", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ question: inputValue })
+            const response = await fetch('/api/flowise', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ prompt: inputValue })
             });
 
             const data = await response.json();
-            const generatedQuery = data.text || data.query || "";
+            const generatedQuery = data.query?.trim();
 
+            if (!generatedQuery) {
+              alert("Flowise did not return a query.");
+              return;
+            }
+
+            // Update the input field and state with the generated Cypher query
             setInputValue(generatedQuery);
             handleChange({ target: { value: generatedQuery } });
 
+            // Load and display the graph
             await loadData(null, generatedQuery);
+
+            // Soft reset the graph view
+            if (fgRef.current) {
+              fgRef.current.zoomToFit(400); // duration in ms
+              fgRef.current.centerAt(0, 0, 400); // optional: re-center
+            }
+
           } catch (error) {
-            console.error("Flowise call failed:", error);
+            console.error("Error handling user prompt:", error);
+            alert("An error occurred while processing your request.");
           }
         };
 
