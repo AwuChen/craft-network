@@ -24,9 +24,9 @@ class CypherViz extends React.Component {
 
   }
 
-  loadData = async (newNodeName = null) => {
+  loadData = async (newNodeName = null, queryOverride = null) => {
     let session = this.driver.session({ database: "neo4j" });
-    let res = await session.run(this.state.query);
+    let res = await session.run(queryOverride || this.state.query);
     session.close();
 
     let nodesMap = new Map();
@@ -183,6 +183,7 @@ const NFCTrigger = ({ addNode }) => {
           e.preventDefault();
 
           // Send natural language to Flowise
+          setInputValue(generatedQuery); // sync textarea
           const response = await fetch('/api/flowise', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -194,7 +195,7 @@ const NFCTrigger = ({ addNode }) => {
 
           handleChange({ target: { value: generatedQuery }}); // updates CypherViz.query
 
-          await loadData(generatedQuery); // pass query directly
+          await loadData(null, generatedQuery); // pass query directly
         };
 
         const handleNodeClick = (node) => {
