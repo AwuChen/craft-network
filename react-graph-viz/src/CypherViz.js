@@ -256,9 +256,8 @@ return (
           value={inputValue}
           onChange={handleInputChange}
         />
-        <button type="submit">Generate Query & Run</button>
+        <button type="submit">Run</button>
       </form>
-      <button id="simulate" onClick={() => loadData()}>Run Raw Query</button>
       <button id="visualize" onClick={() => window.open("https://awuchen.github.io/craft-network-3d/", "_blank")}>Visualize3D</button>
       <button id="info" onClick={() => window.open("https://www.hako.soooul.xyz/drafts/washi", "_blank")}>Info</button>
 
