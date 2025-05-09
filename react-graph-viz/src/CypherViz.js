@@ -251,7 +251,7 @@ return (
     <div width="95%">
       <form onSubmit={handleSubmit}>
         <textarea
-          placeholder="Enter natural language query, node name, or Cypher query..."
+          placeholder="Enter natural language query, search for nodes..."
           style={{ display: "block", width: "95%", height: "60px", margin: "0 auto", textAlign: "center" }}
           value={inputValue}
           onChange={handleInputChange}
