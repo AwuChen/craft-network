@@ -169,89 +169,94 @@ const NFCTrigger = ({ addNode }) => {
       };
 
       const GraphView = ({ data, handleChange, loadData, fgRef, latestNode, driver }) => {
-  const [inputValue, setInputValue] = useState(""); // Keep input empty initially
-  const [selectedNode, setSelectedNode] = useState(null);
-  const [editedNode, setEditedNode] = useState(null); // Stores edited node details
+        const [inputValue, setInputValue] = useState(""); // input text
+        const [selectedNode, setSelectedNode] = useState(null);
+        const [editedNode, setEditedNode] = useState(null);
 
-  const handleInputChange = (event) => {
-    const input = event.target.value;
-    setInputValue(input);
-    handleChange(event); // Update query state (even if blank)
+        const handleInputChange = (event) => {
+          const input = event.target.value;
+          setInputValue(input);
+          handleChange(event); // updates CypherViz state.query too
+        };
 
-    const isCypherQuery = /\b(MATCH|RETURN|WHERE|SET|CREATE|MERGE|DELETE)\b/i.test(input);
+        const handleSubmit = async (e) => {
+          e.preventDefault();
 
-    if (!isCypherQuery && fgRef.current) {
-      const matchedNodes = data.nodes.filter(
-        (node) =>
-        node.name.toLowerCase().includes(input.toLowerCase()) ||
-        (node.title && node.title.toLowerCase().includes(input.toLowerCase()))
-        );
+          // Send natural language to Flowise
+          const response = await fetch('/api/flowise', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: inputValue })
+          });
 
-      if (matchedNodes.length > 0) {
-        const firstMatch = matchedNodes[0];
-        fgRef.current.centerAt(firstMatch.x, firstMatch.y+80, 1500);
-        fgRef.current.zoom(2.5);
-      }
-    }
-  };
+          const data = await response.json();
+          const generatedQuery = data.query; // Assuming Flowise returns { query: "..." }
 
-  const handleNodeClick = (node) => {
-  if (!node) return; // Prevent errors if node is null
-  setSelectedNode(node);
-  setEditedNode({ ...node }); // Clone the selected node for editing
-};
+          handleChange({ target: { value: generatedQuery }}); // updates CypherViz.query
 
-const handleEditChange = (event) => {
-  const { name, value } = event.target;
-  setEditedNode((prev) => ({
-    ...prev,
-    [name]: value,
-  }));
-};
+          await loadData(generatedQuery); // pass query directly
+        };
 
-const saveNodeChanges = async () => {
-  if (!editedNode || !selectedNode) return;
+        const handleNodeClick = (node) => {
+          if (!node) return; // Prevent errors if node is null
+          setSelectedNode(node);
+          setEditedNode({ ...node }); // Clone the selected node for editing
+        };
 
-  // Ensure the website has "https://" if missing
-  let formattedWebsite = editedNode.website.trim();
-  if (formattedWebsite && !formattedWebsite.startsWith("http://") && !formattedWebsite.startsWith("https://")) {
-    formattedWebsite = "https://" + formattedWebsite;
-  }
+        const handleEditChange = (event) => {
+          const { name, value } = event.target;
+          setEditedNode((prev) => ({
+            ...prev,
+            [name]: value,
+          }));
+        };
 
-  const session = driver.session();
-  try {
-    await session.run(
-      `MATCH (u:User {name: $oldName}) 
-      SET u.name = $newName, u.role = $role, u.title = $title, u.website = $website`,
-      {
-        oldName: selectedNode.name,
-        newName: editedNode.name,
-        role: editedNode.role,
-        title: editedNode.title,
-        website: formattedWebsite, // Use the corrected website
-      }
-    );
-    await loadData(editedNode.name); // Keep the edited node as latestNode
-    setTimeout(() => setSelectedNode(null), 100); // Close the panel after a brief delay
-  } catch (error) {
-    console.error("Error updating node:", error);
-  } finally {
-    session.close();
-  }
-};
+        const saveNodeChanges = async () => {
+          if (!editedNode || !selectedNode) return;
+
+          // Ensure the website has "https://" if missing
+          let formattedWebsite = editedNode.website.trim();
+          if (formattedWebsite && !formattedWebsite.startsWith("http://") && !formattedWebsite.startsWith("https://")) {
+            formattedWebsite = "https://" + formattedWebsite;
+          }
+
+          const session = driver.session();
+          try {
+            await session.run(
+              `MATCH (u:User {name: $oldName}) 
+              SET u.name = $newName, u.role = $role, u.title = $title, u.website = $website`,
+              {
+                oldName: selectedNode.name,
+                newName: editedNode.name,
+                role: editedNode.role,
+                title: editedNode.title,
+                website: formattedWebsite, // Use the corrected website
+              }
+            );
+            await loadData(editedNode.name); // Keep the edited node as latestNode
+            setTimeout(() => setSelectedNode(null), 100); // Close the panel after a brief delay
+          } catch (error) {
+            console.error("Error updating node:", error);
+          } finally {
+            session.close();
+          }
+        };
 
 
 return (
-  <div width="95%">
-  <textarea
-  placeholder="Enter query, node name, or title..."
-  style={{ display: "block", width: "95%", height: "60px", margin: "0 auto", textAlign: "center" }}
-  value={inputValue}
-  onChange={handleInputChange}
-  />
-  <button id="simulate" onClick={() => loadData()}>Run</button>
-  <button id="visualize" onClick={() => window.open("https://awuchen.github.io/craft-network-3d/", "_blank")}>Visualize3D</button>
-  <button id="info" onClick={() => window.open("https://www.hako.soooul.xyz/drafts/washi", "_blank")}>Info</button>
+    <div width="95%">
+      <form onSubmit={handleSubmit}>
+        <textarea
+          placeholder="Enter natural language query, node name, or Cypher query..."
+          style={{ display: "block", width: "95%", height: "60px", margin: "0 auto", textAlign: "center" }}
+          value={inputValue}
+          onChange={handleInputChange}
+        />
+        <button type="submit">Generate Query & Run</button>
+      </form>
+      <button id="simulate" onClick={() => loadData()}>Run Raw Query</button>
+      <button id="visualize" onClick={() => window.open("https://awuchen.github.io/craft-network-3d/", "_blank")}>Visualize3D</button>
+      <button id="info" onClick={() => window.open("https://www.hako.soooul.xyz/drafts/washi", "_blank")}>Info</button>
 
   <ForceGraph2D
   ref={fgRef}
