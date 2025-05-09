@@ -24,7 +24,7 @@ class CypherViz extends React.Component {
 
   }
 
-  loadData = async (newNodeName = null, queryOverride = null) => {
+  loadData = async (newNodeName = null, queryOverride = null, onComplete = null) => {
     let session = this.driver.session({ database: "neo4j" });
     let res = await session.run(queryOverride || this.state.query);
     session.close();
@@ -34,7 +34,6 @@ class CypherViz extends React.Component {
       let source = r.get("source");
       let target = r.get("target");
 
-    // Add or update source node
       if (!nodesMap.has(source)) {
         nodesMap.set(source, {
           name: source,
@@ -46,7 +45,6 @@ class CypherViz extends React.Component {
         });
       }
 
-    // Add or update target node
       if (!nodesMap.has(target)) {
         nodesMap.set(target, {
           name: target,
@@ -66,11 +64,11 @@ class CypherViz extends React.Component {
 
     localStorage.setItem("graphData", JSON.stringify(updatedData));
     this.setState({ data: updatedData, latestNode: newNodeName }, () => {
+      if (onComplete) onComplete(updatedData); // <- Notify React to update
       if (newNodeName) {
         setTimeout(() => {
           let newNode = nodes.find(n => n.name === newNodeName);
           if (newNode && this.fgRef.current) {
-            console.log("Focusing on:", newNode);
             this.fgRef.current.centerAt(newNode.x, newNode.y, 1500);
             this.fgRef.current.zoom(1.25);
           }
@@ -168,7 +166,8 @@ const NFCTrigger = ({ addNode }) => {
         return <div style={{ textAlign: "center", padding: "20px", fontSize: "16px", color: "red" }}>Processing NFC tap...</div>;
       };
 
-      const GraphView = ({ data, handleChange, loadData, fgRef, latestNode, driver }) => {
+      const GraphView = ({ handleChange, loadData, fgRef, latestNode, driver }) => {
+        const [graphData, setGraphData] = useState({ nodes: [], links: [] });
         const [inputValue, setInputValue] = useState(""); // input text
         const [selectedNode, setSelectedNode] = useState(null);
         const [editedNode, setEditedNode] = useState(null);
@@ -183,29 +182,39 @@ const NFCTrigger = ({ addNode }) => {
           e.preventDefault();
 
           try {
-            const response = await fetch("https://flowise-hako.onrender.com/api/v1/prediction/29e305b3-c569-4676-a454-1c4fdc380c69", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ question: inputValue })
+            const response = await fetch('/api/flowise', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ prompt: inputValue })
             });
 
             const data = await response.json();
-            const generatedQuery = data.text || data.query || "";
+            const generatedQuery = data.query?.trim();
+
+            if (!generatedQuery) {
+              alert("Flowise did not return a query.");
+              return;
+            }
 
             setInputValue(generatedQuery);
             handleChange({ target: { value: generatedQuery } });
 
-            await loadData(null, generatedQuery);
+            await loadData(null, generatedQuery, (newData) => {
+              setGraphData(newData);
+              setTimeout(() => {
+                if (fgRef.current) {
+                  fgRef.current.zoomToFit(400);
+                  fgRef.current.centerAt(0, 0, 400);
+                }
+              }, 100); // Let the graph mount before focusing
+            });
 
-            // Soft reset the graph view
-            if (fgRef.current) {
-              fgRef.current.zoomToFit(400); // duration in ms
-              fgRef.current.centerAt(0, 0, 400); // optional: re-center
-            }
           } catch (error) {
-            console.error("Flowise call failed:", error);
+            console.error("Error handling user prompt:", error);
+            alert("An error occurred while processing your request.");
           }
         };
+
 
         const handleNodeClick = (node) => {
           if (!node) return; // Prevent errors if node is null
@@ -269,7 +278,7 @@ return (
 
   <ForceGraph2D
   ref={fgRef}
-  graphData={data}
+  graphData={graphData}
   nodeId="name"
   nodeLabel={(node) => node.title || "No Title"}
   onNodeClick={handleNodeClick}
