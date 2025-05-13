@@ -278,7 +278,7 @@ const NFCTrigger = ({ addNode }) => {
               }
             );
             await loadData(editedNode.name); // Keep the edited node as latestNode
-            setSelectedNode; // Close the panel
+            setSelectedNode(null); // Close the panel
           } catch (error) {
             console.error("Error updating node:", error);
           } finally {
