@@ -69,7 +69,11 @@ class CypherViz extends React.Component {
           });
         }
 
-        links.push({ source, target });
+        if (nodesMap.has(source) && nodesMap.has(target)) {
+          links.push({ source, target });
+        } else {
+  console.warn("Invalid link skipped:", { source, target });
+}
       } else {
         // fallback: node-only query
         record.keys.forEach((key) => {
@@ -191,7 +195,7 @@ const NFCTrigger = ({ addNode }) => {
 
         setTimeout(() => {
           window.location.assign("/craft-network/#/");
-          }, 1000);
+          }, 2000);
         };
 
         addAndRedirect();
