@@ -115,19 +115,19 @@ class CypherViz extends React.Component {
     this.loadData();
   }
 
-  addNodeNFC = async (newUser) => {
+  addNodeNFC = async (newUser, nfcUserName) => {
     let session = this.driver.session({ database: "neo4j" });
     try {
       await session.run(
         `MERGE (u:User {name: $user}) 
-         ON CREATE SET u.role = 'attendee', 
+         ON CREATE SET u.role = 'affiliate', 
                        u.title = '', 
                        u.website = ''
 
          MERGE (nfc:User {name: $nfcUser}) 
-         ON CREATE SET nfc.role = 'USC Film School', 
-                       nfc.title = 'Graduation 2025', 
-                       nfc.website = 'https://cinema.usc.edu/'
+         ON CREATE SET nfc.role = '', 
+                       nfc.title = '', 
+                       nfc.website = ''
 
          MERGE (awu:User {name: $awuUser}) 
 
@@ -135,7 +135,7 @@ class CypherViz extends React.Component {
         MERGE (nfc)-[:CONNECTED_TO]->(awu)`,
         { 
           user: newUser, 
-          nfcUser: "USC", 
+          nfcUser: nfcUserName, 
           awuUser: "Awu Chen" 
         }
         );
@@ -156,7 +156,7 @@ class CypherViz extends React.Component {
       <Router>
       <div>
       <Routes>
-      <Route path="/NFC" element={<NFCTrigger addNode={this.addNodeNFC} />} />
+      <Route path="/:username" element={<NFCTrigger addNode={this.addNodeNFC} />} />
       <Route path="/" element={
         <GraphView 
         data={this.state.data} 
@@ -176,13 +176,14 @@ class CypherViz extends React.Component {
 
 const NFCTrigger = ({ addNode }) => {
   const location = useLocation();
+  const { username } = useParams();
 
   React.useEffect(() => {
     const addAndRedirect = async () => {
       const newUser = `User-${Date.now()}`;
 
       try {
-        await addNode(newUser);
+        await addNode(newUser, username); // pass dynamic user
         } catch (error) {
           console.error("Error adding user:", error);
           return;
@@ -194,9 +195,9 @@ const NFCTrigger = ({ addNode }) => {
         };
 
         addAndRedirect();
-        }, [location]);
+        }, [location, username]);
 
-        return <div style={{ textAlign: "center", padding: "20px", fontSize: "16px", color: "red" }}>Processing NFC tap...</div>;
+        return <div style={{ textAlign: "center", padding: "20px", fontSize: "16px", color: "red" }}>Processing NFC tap for <strong>{username}</strong>...
       };
 
       const GraphView = ({ data, handleChange, loadData, fgRef, latestNode, driver }) => {
