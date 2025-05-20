@@ -197,11 +197,11 @@ const NFCTrigger = ({ addNode }) => {
         addAndRedirect();
         }, [location, username]);
 
-        return <div style={{ textAlign: "center", padding: "20px", fontSize: "16px", color: "red" }}>Processing NFC tap for <strong>{username}</strong>...
+        return <div style={{ textAlign: "center", padding: "20px", fontSize: "16px", color: "red" }}>Processing NFC tap for <strong>{username}</strong>...</div>
       };
 
       const GraphView = ({ data, handleChange, loadData, fgRef, latestNode, driver }) => {
-        const [inputValue, setInputValue] = useState(""); // input text
+        const [inputValue, setInputValue] = useState(""); 
         const [selectedNode, setSelectedNode] = useState(null);
         const [editedNode, setEditedNode] = useState(null);
 
