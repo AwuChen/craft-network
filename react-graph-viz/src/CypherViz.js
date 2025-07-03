@@ -222,6 +222,31 @@ const NFCTrigger = ({ addNode }) => {
         };
         const oneDegreeNodes = getOneDegreeNodes();
 
+        // Compute N-degree neighbors of latestNode
+        const visibleDegree = 2; // Change this value to adjust visible degree
+        const getNDegreeNodes = (startNode, degree) => {
+          if (!startNode || !data) return new Set();
+          const visited = new Set();
+          let currentLevel = new Set([startNode]);
+          for (let d = 0; d < degree; d++) {
+            const nextLevel = new Set();
+            data.links.forEach(link => {
+              if (currentLevel.has(link.source) && !visited.has(link.target)) {
+                nextLevel.add(link.target);
+              }
+              if (currentLevel.has(link.target) && !visited.has(link.source)) {
+                nextLevel.add(link.source);
+              }
+            });
+            nextLevel.forEach(n => visited.add(n));
+            currentLevel.forEach(n => visited.add(n));
+            currentLevel = nextLevel;
+          }
+          visited.add(startNode);
+          return visited;
+        };
+        const nDegreeNodes = getNDegreeNodes(latestNode, visibleDegree);
+
         const handleInputChange = (event) => {
           const input = event.target.value;
           setInputValue(input);
@@ -331,8 +356,9 @@ return (
       (node.name.toLowerCase().includes(inputValue.toLowerCase()) ||
         (node.title && node.title.toLowerCase().includes(inputValue.toLowerCase())));
     const isOneDegree = oneDegreeNodes.has(node.name);
+    const isNDegree = nDegreeNodes.has(node.name);
 
-    ctx.globalAlpha = isOneDegree ? 1.0 : 0.2;
+    ctx.globalAlpha = isNDegree ? 1.0 : 0.2;
     ctx.fillStyle = node.name === latestNode ? "black" : "white";
     ctx.strokeStyle = isHighlighted ? "red" : "black";
     ctx.lineWidth = isHighlighted ? 3 : 2;
@@ -349,8 +375,8 @@ return (
   }}
   linkCanvasObjectMode={() => 'after'}
   linkCanvasObject={(link, ctx) => {
-    // Only links connected to latestNode are full opacity
-    const isConnected = link.source === latestNode || link.target === latestNode;
+    // A link is visible if both ends are in the nDegreeNodes set
+    const isConnected = nDegreeNodes.has(link.source) && nDegreeNodes.has(link.target);
     ctx.save();
     ctx.globalAlpha = isConnected ? 1.0 : 0.15;
     // Draw the link line manually (after default rendering)
