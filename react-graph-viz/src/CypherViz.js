@@ -208,6 +208,7 @@ const NFCTrigger = ({ addNode }) => {
         const [inputValue, setInputValue] = useState(""); 
         const [selectedNode, setSelectedNode] = useState(null);
         const [editedNode, setEditedNode] = useState(null);
+        const [focusNode, setFocusNode] = useState(null);
 
         // Compute 1-degree neighbors of latestNode
         const getOneDegreeNodes = () => {
@@ -223,7 +224,7 @@ const NFCTrigger = ({ addNode }) => {
         const oneDegreeNodes = getOneDegreeNodes();
 
         // Compute N-degree neighbors of latestNode
-        const visibleDegree = 2; // Change this value to adjust visible degree
+        const visibleDegree = 1; // Change this value to adjust visible degree
         const getNDegreeNodes = (startNode, degree) => {
           if (!startNode || !data) return new Set();
           const visited = new Set();
@@ -231,12 +232,17 @@ const NFCTrigger = ({ addNode }) => {
           for (let d = 0; d < degree; d++) {
             const nextLevel = new Set();
             data.links.forEach(link => {
-              if (currentLevel.has(link.source) && !visited.has(link.target)) {
-                nextLevel.add(link.target);
-              }
-              if (currentLevel.has(link.target) && !visited.has(link.source)) {
-                nextLevel.add(link.source);
-              }
+              // Normalize source/target to node names if they are objects
+              const sourceName = typeof link.source === 'object' ? link.source.name : link.source;
+              const targetName = typeof link.target === 'object' ? link.target.name : link.target;
+              currentLevel.forEach(n => {
+                if (n === sourceName && !visited.has(targetName)) {
+                  nextLevel.add(targetName);
+                }
+                if (n === targetName && !visited.has(sourceName)) {
+                  nextLevel.add(sourceName);
+                }
+              });
             });
             nextLevel.forEach(n => visited.add(n));
             currentLevel.forEach(n => visited.add(n));
@@ -245,7 +251,21 @@ const NFCTrigger = ({ addNode }) => {
           visited.add(startNode);
           return visited;
         };
-        const nDegreeNodes = getNDegreeNodes(latestNode, visibleDegree);
+        const currentFocus = focusNode || latestNode;
+        let nDegreeNodes = getNDegreeNodes(currentFocus, visibleDegree);
+        
+        // If there's a search term, also include nodes that match the search and their n-degree neighbors
+        if (inputValue && inputValue.trim()) {
+          const searchMatches = data.nodes.filter(node => 
+            node.name.toLowerCase().includes(inputValue.toLowerCase()) ||
+            (node.title && node.title.toLowerCase().includes(inputValue.toLowerCase())) ||
+            (node.role && node.role.toLowerCase().includes(inputValue.toLowerCase()))
+          );
+          searchMatches.forEach(match => {
+            const matchNeighbors = getNDegreeNodes(match.name, visibleDegree);
+            matchNeighbors.forEach(neighbor => nDegreeNodes.add(neighbor));
+          });
+        }
 
         const handleInputChange = (event) => {
           const input = event.target.value;
@@ -285,9 +305,18 @@ const NFCTrigger = ({ addNode }) => {
         };
 
         const handleNodeClick = (node) => {
-          if (!node) return; // Prevent errors if node is null
+          if (!node) return;
           setSelectedNode(node);
-          setEditedNode({ ...node }); // Clone the selected node for editing
+          setEditedNode({ ...node });
+          setFocusNode(node.name);
+        };
+
+        const handleNodeHover = (node) => {
+          if (node) {
+            setFocusNode(node.name);
+          } else {
+            setFocusNode(null);
+          }
         };
 
         const handleEditChange = (event) => {
@@ -350,11 +379,14 @@ return (
   nodeId="name"
   nodeLabel={(node) => node.title || "No Title"}
   onNodeClick={handleNodeClick}
+  onNodeHover={handleNodeHover}
+  onBackgroundClick={() => setFocusNode(null)}
   nodeCanvasObject={(node, ctx) => {
     const isHighlighted =
       inputValue &&
       (node.name.toLowerCase().includes(inputValue.toLowerCase()) ||
-        (node.title && node.title.toLowerCase().includes(inputValue.toLowerCase())));
+        (node.title && node.title.toLowerCase().includes(inputValue.toLowerCase())) ||
+        (node.role && node.role.toLowerCase().includes(inputValue.toLowerCase())));
     const isOneDegree = oneDegreeNodes.has(node.name);
     const isNDegree = nDegreeNodes.has(node.name);
 
@@ -373,20 +405,17 @@ return (
 
     ctx.globalAlpha = 1.0; // Reset alpha for next node
   }}
-  linkCanvasObjectMode={() => 'after'}
-  linkCanvasObject={(link, ctx) => {
-    // A link is visible if both ends are in the nDegreeNodes set
-    const isConnected = nDegreeNodes.has(link.source) && nDegreeNodes.has(link.target);
-    ctx.save();
-    ctx.globalAlpha = isConnected ? 1.0 : 0.15;
-    // Draw the link line manually (after default rendering)
-    ctx.beginPath();
-    ctx.moveTo(link.source.x, link.source.y);
-    ctx.lineTo(link.target.x, link.target.y);
-    ctx.strokeStyle = '#999';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.restore();
+  linkColor={(link) => {
+    const sourceName = typeof link.source === 'object' ? link.source.name : link.source;
+    const targetName = typeof link.target === 'object' ? link.target.name : link.target;
+    const isConnected = nDegreeNodes.has(sourceName) && nDegreeNodes.has(targetName);
+    return isConnected ? '#999' : '#ccc';
+  }}
+  linkOpacity={(link) => {
+    const sourceName = typeof link.source === 'object' ? link.source.name : link.source;
+    const targetName = typeof link.target === 'object' ? link.target.name : link.target;
+    const isConnected = nDegreeNodes.has(sourceName) && nDegreeNodes.has(targetName);
+    return isConnected ? 1.0 : 0.15;
   }}
   linkCurvature={0.2}
   linkDirectionalArrowRelPos={1}
