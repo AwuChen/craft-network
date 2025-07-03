@@ -209,6 +209,19 @@ const NFCTrigger = ({ addNode }) => {
         const [selectedNode, setSelectedNode] = useState(null);
         const [editedNode, setEditedNode] = useState(null);
 
+        // Compute 1-degree neighbors of latestNode
+        const getOneDegreeNodes = () => {
+          if (!latestNode || !data) return new Set();
+          const neighbors = new Set();
+          neighbors.add(latestNode);
+          data.links.forEach(link => {
+            if (link.source === latestNode) neighbors.add(link.target);
+            if (link.target === latestNode) neighbors.add(link.source);
+          });
+          return neighbors;
+        };
+        const oneDegreeNodes = getOneDegreeNodes();
+
         const handleInputChange = (event) => {
           const input = event.target.value;
           setInputValue(input);
@@ -314,11 +327,13 @@ return (
   onNodeClick={handleNodeClick}
   nodeCanvasObject={(node, ctx) => {
     const isHighlighted =
-    inputValue &&
-    (node.name.toLowerCase().includes(inputValue.toLowerCase()) ||
-    (node.title && node.title.toLowerCase().includes(inputValue.toLowerCase())));
+      inputValue &&
+      (node.name.toLowerCase().includes(inputValue.toLowerCase()) ||
+        (node.title && node.title.toLowerCase().includes(inputValue.toLowerCase())));
+    const isOneDegree = oneDegreeNodes.has(node.name);
 
-    ctx.fillStyle = node.name === latestNode ? "black" : "white"; // Keep latestNode in black
+    ctx.globalAlpha = isOneDegree ? 1.0 : 0.2;
+    ctx.fillStyle = node.name === latestNode ? "black" : "white";
     ctx.strokeStyle = isHighlighted ? "red" : "black";
     ctx.lineWidth = isHighlighted ? 3 : 2;
 
@@ -329,6 +344,23 @@ return (
 
     ctx.fillStyle = "gray";
     ctx.fillText(node.role, node.x + 10, node.y);
+
+    ctx.globalAlpha = 1.0; // Reset alpha for next node
+  }}
+  linkCanvasObjectMode={() => 'after'}
+  linkCanvasObject={(link, ctx) => {
+    // Only links connected to latestNode are full opacity
+    const isConnected = link.source === latestNode || link.target === latestNode;
+    ctx.save();
+    ctx.globalAlpha = isConnected ? 1.0 : 0.15;
+    // Draw the link line manually (after default rendering)
+    ctx.beginPath();
+    ctx.moveTo(link.source.x, link.source.y);
+    ctx.lineTo(link.target.x, link.target.y);
+    ctx.strokeStyle = '#999';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
   }}
   linkCurvature={0.2}
   linkDirectionalArrowRelPos={1}
