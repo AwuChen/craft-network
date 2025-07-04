@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import './App.css';
 import ForceGraph2D from 'react-force-graph-2d';
@@ -209,6 +209,8 @@ const NFCTrigger = ({ addNode }) => {
         const [selectedNode, setSelectedNode] = useState(null);
         const [editedNode, setEditedNode] = useState(null);
         const [focusNode, setFocusNode] = useState(null);
+        const [clickedNode, setClickedNode] = useState(null);
+        const [lastAction, setLastAction] = useState(null); // 'search', 'click', or 'latestNode'
 
         // Compute 1-degree neighbors of latestNode
         const getOneDegreeNodes = () => {
@@ -251,10 +253,15 @@ const NFCTrigger = ({ addNode }) => {
           visited.add(startNode);
           return visited;
         };
-        const currentFocus = focusNode || latestNode;
-        let nDegreeNodes = getNDegreeNodes(currentFocus, visibleDegree);
+        // For visibility: use hover (focusNode) if available, otherwise clicked node, otherwise latestNode
+        const visibilityFocus = focusNode || clickedNode || latestNode;
+        // For zoom: use the most recent action
+        const zoomFocus = lastAction === 'search' ? 'search' : 
+                         lastAction === 'click' ? clickedNode : 
+                         lastAction === 'latestNode' ? latestNode : null;
+        const visibilityNodes = getNDegreeNodes(visibilityFocus, visibleDegree);
         
-        // If there's a search term, also include nodes that match the search and their n-degree neighbors
+        // Always include search results in visibility if there's a search term
         if (inputValue && inputValue.trim()) {
           const searchMatches = data.nodes.filter(node => 
             node.name.toLowerCase().includes(inputValue.toLowerCase()) ||
@@ -263,14 +270,132 @@ const NFCTrigger = ({ addNode }) => {
           );
           searchMatches.forEach(match => {
             const matchNeighbors = getNDegreeNodes(match.name, visibleDegree);
-            matchNeighbors.forEach(neighbor => nDegreeNodes.add(neighbor));
+            matchNeighbors.forEach(neighbor => visibilityNodes.add(neighbor));
           });
         }
+        
+        const zoomNodes = lastAction === 'search' ? 
+                         (() => {
+                           const searchMatches = data.nodes.filter(node => 
+                             node.name.toLowerCase().includes(inputValue.toLowerCase()) ||
+                             (node.title && node.title.toLowerCase().includes(inputValue.toLowerCase())) ||
+                             (node.role && node.role.toLowerCase().includes(inputValue.toLowerCase()))
+                           );
+                           const searchNodes = new Set();
+                           searchMatches.forEach(match => {
+                             const matchNeighbors = getNDegreeNodes(match.name, visibleDegree);
+                             matchNeighbors.forEach(neighbor => searchNodes.add(neighbor));
+                           });
+                           return searchNodes;
+                         })() : 
+                         getNDegreeNodes(zoomFocus, visibleDegree);
+        
+        // Auto-zoom to visible nodes
+        useEffect(() => {
+          // Only auto-zoom if there's a search term or if a node was clicked (not just hovered)
+          // Don't auto-zoom for latestNode unless there's no other focus
+          if (fgRef.current && zoomNodes.size > 0) {
+            // Zoom based on last action
+            if (lastAction === 'click' && clickedNode) {
+              const visibleNodes = data.nodes.filter(node => zoomNodes.has(node.name));
+              if (visibleNodes.length > 0) {
+                // Calculate bounding box of visible nodes
+                const xs = visibleNodes.map(n => n.x);
+                const ys = visibleNodes.map(n => n.y);
+                const minX = Math.min(...xs);
+                const maxX = Math.max(...xs);
+                const minY = Math.min(...ys);
+                const maxY = Math.max(...ys);
+                
+                const centerX = (minX + maxX) / 2;
+                const centerY = (minY + maxY) / 2;
+                const width = maxX - minX;
+                const height = maxY - minY;
+                
+                // Add some padding
+                const padding = 100;
+                const scale = Math.min(
+                  (window.innerWidth - padding) / width,
+                  (window.innerHeight - padding) / height,
+                  2 // Max zoom level
+                );
+                
+                fgRef.current.centerAt(centerX, centerY, 1000);
+                fgRef.current.zoom(scale, 1000);
+              }
+            }
+            // For search results (only if no node is clicked)
+            else if (lastAction === 'search' && inputValue) {
+              const visibleNodes = data.nodes.filter(node => zoomNodes.has(node.name));
+              if (visibleNodes.length > 0) {
+                // Calculate bounding box of visible nodes
+                const xs = visibleNodes.map(n => n.x);
+                const ys = visibleNodes.map(n => n.y);
+                const minX = Math.min(...xs);
+                const maxX = Math.max(...xs);
+                const minY = Math.min(...ys);
+                const maxY = Math.max(...ys);
+                
+                const centerX = (minX + maxX) / 2;
+                const centerY = (minY + maxY) / 2;
+                const width = maxX - minX;
+                const height = maxY - minY;
+                
+                // Add some padding
+                const padding = 100;
+                const scale = Math.min(
+                  (window.innerWidth - padding) / width,
+                  (window.innerHeight - padding) / height,
+                  2 // Max zoom level
+                );
+                
+                fgRef.current.centerAt(centerX, centerY, 1000);
+                fgRef.current.zoom(scale, 1000);
+              }
+            }
+            // For latestNode, delay the zoom to allow graph to stabilize
+            else if (lastAction === 'latestNode' && latestNode) {
+              setTimeout(() => {
+                const visibleNodes = data.nodes.filter(node => zoomNodes.has(node.name));
+                if (visibleNodes.length > 0 && fgRef.current) {
+                  // Calculate bounding box of visible nodes
+                  const xs = visibleNodes.map(n => n.x);
+                  const ys = visibleNodes.map(n => n.y);
+                  const minX = Math.min(...xs);
+                  const maxX = Math.max(...xs);
+                  const minY = Math.min(...ys);
+                  const maxY = Math.max(...ys);
+                  
+                  const centerX = (minX + maxX) / 2;
+                  const centerY = (minY + maxY) / 2;
+                  const width = maxX - minX;
+                  const height = maxY - minY;
+                  
+                  // Add some padding
+                  const padding = 100;
+                  const scale = Math.min(
+                    (window.innerWidth - padding) / width,
+                    (window.innerHeight - padding) / height,
+                    2 // Max zoom level
+                  );
+                  
+                  fgRef.current.centerAt(centerX, centerY, 1000);
+                  fgRef.current.zoom(scale, 1000);
+                }
+              }, 1000); // 1 second delay for latestNode
+            }
+          }
+        }, [zoomNodes, data.nodes, fgRef, lastAction, clickedNode, latestNode, inputValue]);
 
         const handleInputChange = (event) => {
           const input = event.target.value;
           setInputValue(input);
           handleChange(event); // updates CypherViz state.query too
+          // Clear other actions when searching
+          if (input.trim()) {
+            setClickedNode(null);
+            setLastAction('search');
+          }
         };
 
         const handleSubmit = async (e) => {
@@ -309,6 +434,10 @@ const NFCTrigger = ({ addNode }) => {
           setSelectedNode(node);
           setEditedNode({ ...node });
           setFocusNode(node.name);
+          setClickedNode(node.name);
+          setLastAction('click');
+          // Clear search when clicking a node to avoid zoom conflicts
+          setInputValue("");
         };
 
         const handleNodeHover = (node) => {
@@ -380,7 +509,11 @@ return (
   nodeLabel={(node) => node.title || "No Title"}
   onNodeClick={handleNodeClick}
   onNodeHover={handleNodeHover}
-  onBackgroundClick={() => setFocusNode(null)}
+  onBackgroundClick={() => {
+    setFocusNode(null);
+    setClickedNode(null);
+    setLastAction(null);
+  }}
   nodeCanvasObject={(node, ctx) => {
     const isHighlighted =
       inputValue &&
@@ -388,7 +521,7 @@ return (
         (node.title && node.title.toLowerCase().includes(inputValue.toLowerCase())) ||
         (node.role && node.role.toLowerCase().includes(inputValue.toLowerCase())));
     const isOneDegree = oneDegreeNodes.has(node.name);
-    const isNDegree = nDegreeNodes.has(node.name);
+    const isNDegree = visibilityNodes.has(node.name);
 
     ctx.globalAlpha = isNDegree ? 1.0 : 0.2;
     ctx.fillStyle = node.name === latestNode ? "black" : "white";
@@ -408,13 +541,13 @@ return (
   linkColor={(link) => {
     const sourceName = typeof link.source === 'object' ? link.source.name : link.source;
     const targetName = typeof link.target === 'object' ? link.target.name : link.target;
-    const isConnected = nDegreeNodes.has(sourceName) && nDegreeNodes.has(targetName);
+    const isConnected = visibilityNodes.has(sourceName) && visibilityNodes.has(targetName);
     return isConnected ? '#999' : '#ccc';
   }}
   linkOpacity={(link) => {
     const sourceName = typeof link.source === 'object' ? link.source.name : link.source;
     const targetName = typeof link.target === 'object' ? link.target.name : link.target;
-    const isConnected = nDegreeNodes.has(sourceName) && nDegreeNodes.has(targetName);
+    const isConnected = visibilityNodes.has(sourceName) && visibilityNodes.has(targetName);
     return isConnected ? 1.0 : 0.15;
   }}
   linkCurvature={0.2}
