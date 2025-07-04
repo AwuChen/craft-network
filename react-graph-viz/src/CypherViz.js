@@ -212,6 +212,13 @@ const NFCTrigger = ({ addNode }) => {
         const [clickedNode, setClickedNode] = useState(null);
         const [lastAction, setLastAction] = useState(null); // 'search', 'click', or 'latestNode'
 
+        // Detect when latestNode changes (NFC addition) and set lastAction
+        useEffect(() => {
+          if (latestNode) {
+            setLastAction('latestNode');
+          }
+        }, [latestNode]);
+
         // Compute 1-degree neighbors of latestNode
         const getOneDegreeNodes = () => {
           if (!latestNode || !data) return new Set();
