@@ -219,6 +219,18 @@ const NFCTrigger = ({ addNode }) => {
           }
         }, [latestNode]);
 
+        // Initial zoom when graph first loads
+        useEffect(() => {
+          if (fgRef.current && data.nodes.length > 0 && !lastAction) {
+            // Wait a bit for the graph to settle, then zoom to 2x
+            setTimeout(() => {
+              if (fgRef.current) {
+                fgRef.current.zoom(2, 1000);
+              }
+            }, 1000);
+          }
+        }, [data.nodes, fgRef, lastAction]);
+
         // Compute 1-degree neighbors of latestNode
         const getOneDegreeNodes = () => {
           if (!latestNode || !data) return new Set();
