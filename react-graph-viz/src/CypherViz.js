@@ -210,7 +210,8 @@ const NFCTrigger = ({ addNode }) => {
         const [editedNode, setEditedNode] = useState(null);
         const [focusNode, setFocusNode] = useState(null);
         const [clickedNode, setClickedNode] = useState(null);
-        const [lastAction, setLastAction] = useState(null); // 'search', 'click', or 'latestNode'
+        const [lastAction, setLastAction] = useState(null); // 'search', 'click', 'latestNode', or 'mutation'
+        const [mutatedNodes, setMutatedNodes] = useState([]); // Track nodes created/modified by mutation queries
 
         // Detect when latestNode changes (NFC addition) and set lastAction
         useEffect(() => {
@@ -277,7 +278,8 @@ const NFCTrigger = ({ addNode }) => {
         // For zoom: use the most recent action
         const zoomFocus = lastAction === 'search' ? 'search' : 
                          lastAction === 'click' ? clickedNode : 
-                         lastAction === 'latestNode' ? latestNode : null;
+                         lastAction === 'latestNode' ? latestNode :
+                         lastAction === 'mutation' ? mutatedNodes[0] : null;
         const visibilityNodes = getNDegreeNodes(visibilityFocus, visibleDegree);
         
         // Always include search results in visibility if there's a search term
@@ -290,6 +292,14 @@ const NFCTrigger = ({ addNode }) => {
           searchMatches.forEach(match => {
             const matchNeighbors = getNDegreeNodes(match.name, visibleDegree);
             matchNeighbors.forEach(neighbor => visibilityNodes.add(neighbor));
+          });
+        }
+        
+        // Always include mutated nodes in visibility if there was a mutation
+        if (lastAction === 'mutation' && mutatedNodes.length > 0) {
+          mutatedNodes.forEach(nodeName => {
+            const nodeNeighbors = getNDegreeNodes(nodeName, visibleDegree);
+            nodeNeighbors.forEach(neighbor => visibilityNodes.add(neighbor));
           });
         }
         
@@ -307,6 +317,15 @@ const NFCTrigger = ({ addNode }) => {
                            });
                            return searchNodes;
                          })() : 
+                        lastAction === 'mutation' ?
+                        (() => {
+                          const mutationNodes = new Set();
+                          mutatedNodes.forEach(nodeName => {
+                            const nodeNeighbors = getNDegreeNodes(nodeName, visibleDegree);
+                            nodeNeighbors.forEach(neighbor => mutationNodes.add(neighbor));
+                          });
+                          return mutationNodes;
+                        })() :
                          getNDegreeNodes(zoomFocus, visibleDegree);
         
         // Auto-zoom to visible nodes
@@ -403,8 +422,39 @@ const NFCTrigger = ({ addNode }) => {
                 }
               }, 1000); // 1 second delay for latestNode
             }
+            // For mutation queries, zoom to the mutated nodes
+            else if (lastAction === 'mutation' && mutatedNodes.length > 0) {
+              setTimeout(() => {
+                const visibleNodes = data.nodes.filter(node => zoomNodes.has(node.name));
+                if (visibleNodes.length > 0 && fgRef.current) {
+                  // Calculate bounding box of visible nodes
+                  const xs = visibleNodes.map(n => n.x);
+                  const ys = visibleNodes.map(n => n.y);
+                  const minX = Math.min(...xs);
+                  const maxX = Math.max(...xs);
+                  const minY = Math.min(...ys);
+                  const maxY = Math.max(...ys);
+                  
+                  const centerX = (minX + maxX) / 2;
+                  const centerY = (minY + maxY) / 2;
+                  const width = maxX - minX;
+                  const height = maxY - minY;
+                  
+                  // Add some padding
+                  const padding = 100;
+                  const scale = Math.min(
+                    (window.innerWidth - padding) / width,
+                    (window.innerHeight - padding) / height,
+                    2 // Max zoom level
+                  );
+                  
+                  fgRef.current.centerAt(centerX, centerY, 1000);
+                  fgRef.current.zoom(scale, 1000);
+                }
+              }, 1000); // 1 second delay for mutation
+            }
           }
-        }, [zoomNodes, data.nodes, fgRef, lastAction, clickedNode, latestNode, inputValue]);
+        }, [zoomNodes, data.nodes, fgRef, lastAction, clickedNode, latestNode, inputValue, mutatedNodes]);
 
         const handleInputChange = (event) => {
           const input = event.target.value;
@@ -440,27 +490,23 @@ const NFCTrigger = ({ addNode }) => {
             
             // If it's a mutation query, reload with the default MATCH query to show the updated graph
             if (isMutationQuery) {
-              // Extract the node name from the mutation query to focus on it
-              let affectedNode = null;
+              // Extract node names from the mutation query to track what was created/modified
+              const nodeMatches = generatedQuery.match(/\{([^}]+)\}/g);
+              const extractedNodes = nodeMatches ? 
+                nodeMatches.map(match => {
+                  const nameMatch = match.match(/name:\s*['"]([^'"]+)['"]/);
+                  return nameMatch ? nameMatch[1] : null;
+                }).filter(Boolean) : [];
               
-              // Try to extract node name from CREATE or MERGE statements
-              const createMatch = generatedQuery.match(/(?:CREATE|MERGE)\s*\([^:]*:User\s*\{[^}]*name:\s*['"`]?([^'"`\s,}]+)['"`]?/i);
-              if (createMatch) {
-                affectedNode = createMatch[1];
-              }
-              
-              // Try to extract node name from SET statements
-              const setMatch = generatedQuery.match(/MATCH\s*\([^:]*:User\s*\{[^}]*name:\s*['"`]?([^'"`\s,}]+)['"`]?/i);
-              if (setMatch) {
-                affectedNode = setMatch[1];
-              }
+              setMutatedNodes(extractedNodes);
+              setLastAction('mutation');
               
               const defaultQuery = `
                 MATCH (u:User)-[r:CONNECTED_TO]->(v:User)
                 RETURN u.name AS source, u.role AS sourceRole, u.title AS sourceTitle, u.website AS sourceWebsite, 
                        v.name AS target, v.role AS targetRole, v.title AS targetTitle, v.website AS targetWebsite
               `;
-              await loadData(affectedNode, defaultQuery);
+              await loadData(null, defaultQuery);
             }
             
             } catch (error) {
@@ -552,6 +598,7 @@ return (
     setFocusNode(null);
     setClickedNode(null);
     setLastAction(null);
+    setMutatedNodes([]);
   }}
   nodeCanvasObject={(node, ctx) => {
     const isHighlighted =
