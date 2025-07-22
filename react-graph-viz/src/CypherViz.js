@@ -486,7 +486,7 @@ const NFCTrigger = ({ addNode }) => {
             await loadData(null, generatedQuery);
 
             // Check if the generated query is a mutation query (updates the graph)
-            const isMutationQuery = /^(CREATE|MERGE|SET|DELETE|REMOVE|DETACH DELETE)/i.test(generatedQuery.trim());
+            const isMutationQuery = /(CREATE|MERGE|SET|DELETE|REMOVE|DETACH DELETE)/i.test(generatedQuery.trim());
             
             // If it's a mutation query, reload with the default MATCH query to show the updated graph
             if (isMutationQuery) {
