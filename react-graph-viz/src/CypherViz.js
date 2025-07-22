@@ -42,7 +42,6 @@ class CypherViz extends React.Component {
 
     // Intelligent parser
     res.records.forEach((record) => {
-      // Check for standard source/target format
       if (record.has("source") && record.has("target")) {
         // standard case
         let source = record.get("source");
@@ -73,47 +72,8 @@ class CypherViz extends React.Component {
         if (nodesMap.has(source) && nodesMap.has(target)) {
           links.push({ source, target });
         } else {
-          console.warn("Invalid link skipped:", { source, target });
-        }
-      } else if (record.has("u") && record.has("v")) {
-        // Handle queries that return nodes as u and v
-        const u = record.get("u");
-        const v = record.get("v");
-        
-        if (u && u.properties) {
-          const name = u.properties.name || `Node-${u.identity.low}`;
-          if (!nodesMap.has(name)) {
-            nodesMap.set(name, {
-              name,
-              role: u.properties.role || "",
-              title: u.properties.title || "",
-              website: u.properties.website || "",
-              x: Math.random() * 500,
-              y: Math.random() * 500,
-            });
-          }
-        }
-        
-        if (v && v.properties) {
-          const name = v.properties.name || `Node-${v.identity.low}`;
-          if (!nodesMap.has(name)) {
-            nodesMap.set(name, {
-              name,
-              role: v.properties.role || "",
-              title: v.properties.title || "",
-              website: v.properties.website || "",
-              x: Math.random() * 500,
-              y: Math.random() * 500,
-            });
-          }
-        }
-        
-        // Try to create a link if both nodes exist
-        if (u && v && u.properties && v.properties) {
-          const sourceName = u.properties.name || `Node-${u.identity.low}`;
-          const targetName = v.properties.name || `Node-${v.identity.low}`;
-          links.push({ source: sourceName, target: targetName });
-        }
+  console.warn("Invalid link skipped:", { source, target });
+}
       } else {
         // fallback: node-only query
         record.keys.forEach((key) => {
@@ -258,18 +218,6 @@ const NFCTrigger = ({ addNode }) => {
             setLastAction('latestNode');
           }
         }, [latestNode]);
-
-        // Initial zoom when graph first loads
-        useEffect(() => {
-          if (fgRef.current && data.nodes.length > 0 && !lastAction) {
-            // Wait a bit for the graph to settle, then zoom to 2x
-            setTimeout(() => {
-              if (fgRef.current) {
-                fgRef.current.zoom(2, 1000);
-              }
-            }, 1000);
-          }
-        }, [data.nodes, fgRef, lastAction]);
 
         // Compute 1-degree neighbors of latestNode
         const getOneDegreeNodes = () => {
@@ -460,38 +408,32 @@ const NFCTrigger = ({ addNode }) => {
         const handleSubmit = async (e) => {
           e.preventDefault();
 
-          // Check if input looks like a Cypher query
-          const isCypherQuery = inputValue.trim().toUpperCase().includes('MATCH') || 
-                               inputValue.trim().toUpperCase().includes('RETURN') ||
-                               inputValue.trim().toUpperCase().includes('CYPHER');
+          try {
+            const response = await fetch("https://flowise-hako.onrender.com/api/v1/prediction/29e305b3-c569-4676-a454-1c4fdc380c69", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ question: inputValue })
+            });
 
-          let queryToExecute;
+            const data = await response.json();
+            const generatedQuery = data.text || data.query || "";
 
-          if (isCypherQuery) {
-            // Use the input directly as a Cypher query
-            queryToExecute = inputValue.trim();
-          } else {
-            // Use Flowise API to generate a query from natural language
-            try {
-              const response = await fetch("https://flowise-hako.onrender.com/api/v1/prediction/29e305b3-c569-4676-a454-1c4fdc380c69", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ question: inputValue })
-              });
+            setInputValue(generatedQuery);
+            handleChange({ target: { value: generatedQuery } });
 
-              const data = await response.json();
-              queryToExecute = data.text || data.query || "";
+            await loadData(null, generatedQuery);
+
+            // Then reload the full graph with your default MATCH query
+            //const defaultQuery = `
+              //MATCH (u:User)-[r:CONNECTED_TO]->(v:User)
+              //RETURN u.name AS source, u.role AS sourceRole, u.title AS sourceTitle, u.website AS sourceWebsite, 
+              //       v.name AS target, v.role AS targetRole, v.title AS targetTitle, v.website AS targetWebsite
+            //`;
+            await loadData(null, defaultQuery);
+            
             } catch (error) {
               console.error("Flowise call failed:", error);
-              return;
             }
-          }
-
-          if (queryToExecute) {
-            setInputValue(queryToExecute);
-            handleChange({ target: { value: queryToExecute } });
-            await loadData(null, queryToExecute);
-          }
         };
 
         const handleNodeClick = (node) => {
