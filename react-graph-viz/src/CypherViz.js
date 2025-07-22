@@ -433,15 +433,27 @@ const NFCTrigger = ({ addNode }) => {
             setInputValue(generatedQuery);
             handleChange({ target: { value: generatedQuery } });
 
-            await loadData(null, generatedQuery);
-
-            // Then reload the full graph with your default MATCH query
-            const defaultQuery = `
-              MATCH (u:User)-[r:CONNECTED_TO]->(v:User)
-              RETURN u.name AS source, u.role AS sourceRole, u.title AS sourceTitle, u.website AS sourceWebsite, 
-                     v.name AS target, v.role AS targetRole, v.title AS targetTitle, v.website AS targetWebsite
-            `;
-            await loadData(null, defaultQuery);
+            // Determine if this is a filtering query or network query
+            const isNetworkQuery = generatedQuery.toLowerCase().includes('connected_to') || 
+                                  generatedQuery.toLowerCase().includes('relationship') ||
+                                  generatedQuery.toLowerCase().includes('link');
+            
+            if (isNetworkQuery) {
+              // For network queries, load the query results and then show full graph
+              await loadData(null, generatedQuery);
+              
+              // Then reload the full graph with your default MATCH query
+              const defaultQuery = `
+                MATCH (u:User)-[r:CONNECTED_TO]->(v:User)
+                RETURN u.name AS source, u.role AS sourceRole, u.title AS sourceTitle, u.website AS sourceWebsite, 
+                       v.name AS target, v.role AS targetRole, v.title AS targetTitle, v.website AS targetWebsite
+              `;
+              await loadData(null, defaultQuery);
+            } else {
+              // For filtering queries, just run the query to highlight specific nodes
+              // The search highlighting will show the matching nodes
+              setLastAction('search');
+            }
             
             } catch (error) {
               console.error("Flowise call failed:", error);
