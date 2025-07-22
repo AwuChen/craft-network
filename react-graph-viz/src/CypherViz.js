@@ -440,14 +440,19 @@ const NFCTrigger = ({ addNode }) => {
             
             // If it's a mutation query, reload with the default MATCH query to show the updated graph
             if (isMutationQuery) {
-              // Extract the affected node name from the mutation query
+              // Extract the node name from the mutation query to focus on it
               let affectedNode = null;
-              if (generatedQuery.includes('CREATE') || generatedQuery.includes('MERGE')) {
-                // Try to extract node name from patterns like "CREATE (n:User {name: 'John'})" or "MERGE (n:User {name: 'John'})"
-                const nameMatch = generatedQuery.match(/name:\s*['"`]([^'"`]+)['"`]/i);
-                if (nameMatch) {
-                  affectedNode = nameMatch[1];
-                }
+              
+              // Try to extract node name from CREATE or MERGE statements
+              const createMatch = generatedQuery.match(/(?:CREATE|MERGE)\s*\([^:]*:User\s*\{[^}]*name:\s*['"`]?([^'"`\s,}]+)['"`]?/i);
+              if (createMatch) {
+                affectedNode = createMatch[1];
+              }
+              
+              // Try to extract node name from SET statements
+              const setMatch = generatedQuery.match(/MATCH\s*\([^:]*:User\s*\{[^}]*name:\s*['"`]?([^'"`\s,}]+)['"`]?/i);
+              if (setMatch) {
+                affectedNode = setMatch[1];
               }
               
               const defaultQuery = `
