@@ -211,6 +211,9 @@ const NFCTrigger = ({ addNode }) => {
         const [focusNode, setFocusNode] = useState(null);
         const [clickedNode, setClickedNode] = useState(null);
         const [lastAction, setLastAction] = useState(null); // 'search', 'click', or 'latestNode'
+        const [previousGraphState, setPreviousGraphState] = useState(null);
+        const [newNodes, setNewNodes] = useState(new Set());
+        const [newLinks, setNewLinks] = useState(new Set());
 
         // Detect when latestNode changes (NFC addition) and set lastAction
         useEffect(() => {
@@ -218,6 +221,62 @@ const NFCTrigger = ({ addNode }) => {
             setLastAction('latestNode');
           }
         }, [latestNode]);
+
+        // Track graph changes when data updates
+        useEffect(() => {
+          if (previousGraphState && data.nodes.length > 0) {
+            // Find new nodes
+            const currentNodeNames = new Set(data.nodes.map(n => n.name));
+            const previousNodeNames = new Set(previousGraphState.nodes.map(n => n.name));
+            const newNodesSet = new Set();
+            currentNodeNames.forEach(name => {
+              if (!previousNodeNames.has(name)) {
+                newNodesSet.add(name);
+              }
+            });
+            
+            // Find new links
+            const currentLinks = new Set(data.links.map(l => 
+              `${typeof l.source === 'object' ? l.source.name : l.source}-${typeof l.target === 'object' ? l.target.name : l.target}`
+            ));
+            const previousLinks = new Set(previousGraphState.links.map(l => 
+              `${typeof l.source === 'object' ? l.source.name : l.source}-${typeof l.target === 'object' ? l.target.name : l.target}`
+            ));
+            const newLinksSet = new Set();
+            currentLinks.forEach(link => {
+              if (!previousLinks.has(link)) {
+                newLinksSet.add(link);
+              }
+            });
+            
+            setNewNodes(newNodesSet);
+            setNewLinks(newLinksSet);
+            
+            // Clear highlights after 5 seconds
+            setTimeout(() => {
+              setNewNodes(new Set());
+              setNewLinks(new Set());
+            }, 5000);
+          }
+          
+          // Update previous state for next comparison
+          setPreviousGraphState({
+            nodes: [...data.nodes],
+            links: [...data.links]
+          });
+        }, [data.nodes, data.links]);
+
+        // Initial zoom when graph first loads
+        useEffect(() => {
+          if (fgRef.current && data.nodes.length > 0 && !lastAction) {
+            // Wait a bit for the graph to settle, then zoom to 2x
+            setTimeout(() => {
+              if (fgRef.current) {
+                fgRef.current.zoom(2, 1000);
+              }
+            }, 1000);
+          }
+        }, [data.nodes, fgRef, lastAction]);
 
         // Compute 1-degree neighbors of latestNode
         const getOneDegreeNodes = () => {
@@ -408,6 +467,12 @@ const NFCTrigger = ({ addNode }) => {
         const handleSubmit = async (e) => {
           e.preventDefault();
 
+          // Store current state before query execution
+          setPreviousGraphState({
+            nodes: [...data.nodes],
+            links: [...data.links]
+          });
+
           try {
             const response = await fetch("https://flowise-hako.onrender.com/api/v1/prediction/29e305b3-c569-4676-a454-1c4fdc380c69", {
               method: "POST",
@@ -422,14 +487,6 @@ const NFCTrigger = ({ addNode }) => {
             handleChange({ target: { value: generatedQuery } });
 
             await loadData(null, generatedQuery);
-
-            // Then reload the full graph with your default MATCH query
-            //const defaultQuery = `
-              //MATCH (u:User)-[r:CONNECTED_TO]->(v:User)
-              //RETURN u.name AS source, u.role AS sourceRole, u.title AS sourceTitle, u.website AS sourceWebsite, 
-              //       v.name AS target, v.role AS targetRole, v.title AS targetTitle, v.website AS targetWebsite
-            //`;
-            //await loadData(null, defaultQuery);
             
             } catch (error) {
               console.error("Flowise call failed:", error);
@@ -529,11 +586,12 @@ return (
         (node.role && node.role.toLowerCase().includes(inputValue.toLowerCase())));
     const isOneDegree = oneDegreeNodes.has(node.name);
     const isNDegree = visibilityNodes.has(node.name);
+    const isNewNode = newNodes.has(node.name);
 
     ctx.globalAlpha = isNDegree ? 1.0 : 0.2;
     ctx.fillStyle = node.name === latestNode ? "black" : "white";
-    ctx.strokeStyle = isHighlighted ? "red" : "black";
-    ctx.lineWidth = isHighlighted ? 3 : 2;
+    ctx.strokeStyle = isNewNode ? "#00ff00" : isHighlighted ? "red" : "black";
+    ctx.lineWidth = isNewNode ? 4 : isHighlighted ? 3 : 2;
 
     ctx.beginPath();
     ctx.arc(node.x || Math.random() * 500, node.y || Math.random() * 500, 6, 0, 2 * Math.PI);
@@ -549,13 +607,17 @@ return (
     const sourceName = typeof link.source === 'object' ? link.source.name : link.source;
     const targetName = typeof link.target === 'object' ? link.target.name : link.target;
     const isConnected = visibilityNodes.has(sourceName) && visibilityNodes.has(targetName);
-    return isConnected ? '#999' : '#ccc';
+    const linkKey = `${sourceName}-${targetName}`;
+    const isNewLink = newLinks.has(linkKey);
+    return isNewLink ? '#00ff00' : isConnected ? '#999' : '#ccc';
   }}
   linkOpacity={(link) => {
     const sourceName = typeof link.source === 'object' ? link.source.name : link.source;
     const targetName = typeof link.target === 'object' ? link.target.name : link.target;
     const isConnected = visibilityNodes.has(sourceName) && visibilityNodes.has(targetName);
-    return isConnected ? 1.0 : 0.15;
+    const linkKey = `${sourceName}-${targetName}`;
+    const isNewLink = newLinks.has(linkKey);
+    return isNewLink ? 1.0 : isConnected ? 1.0 : 0.15;
   }}
   linkCurvature={0.2}
   linkDirectionalArrowRelPos={1}
