@@ -429,7 +429,7 @@ const NFCTrigger = ({ addNode }) => {
               //RETURN u.name AS source, u.role AS sourceRole, u.title AS sourceTitle, u.website AS sourceWebsite, 
               //       v.name AS target, v.role AS targetRole, v.title AS targetTitle, v.website AS targetWebsite
             //`;
-            await loadData(null, defaultQuery);
+            //await loadData(null, defaultQuery);
             
             } catch (error) {
               console.error("Flowise call failed:", error);
