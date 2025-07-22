@@ -147,6 +147,12 @@ class CypherViz extends React.Component {
   }
 
   addNodeNFC = async (newUser, nfcUserName) => {
+    // Helper function to capitalize first letter of each word
+    const capitalizeWords = (str) => {
+      if (!str) return str;
+      return str.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+    };
+
     let session = this.driver.session({ database: "neo4j" });
     try {
       await session.run(
@@ -165,8 +171,8 @@ class CypherViz extends React.Component {
          MERGE (u)-[:CONNECTED_TO]->(nfc) 
         MERGE (nfc)-[:CONNECTED_TO]->(awu)`,
         { 
-          user: newUser, 
-          nfcUser: nfcUserName, 
+          user: capitalizeWords(newUser), 
+          nfcUser: capitalizeWords(nfcUserName), 
           awuUser: "Awu Chen" 
         }
         );
@@ -592,6 +598,12 @@ const NFCTrigger = ({ addNode }) => {
         const saveNodeChanges = async () => {
           if (!editedNode || !selectedNode) return;
 
+          // Helper function to capitalize first letter of each word
+          const capitalizeWords = (str) => {
+            if (!str) return str;
+            return str.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+          };
+
           // Ensure the website has "https://" if missing
           let formattedWebsite = editedNode.website.trim();
           if (formattedWebsite && !formattedWebsite.startsWith("http://") && !formattedWebsite.startsWith("https://")) {
@@ -605,9 +617,9 @@ const NFCTrigger = ({ addNode }) => {
               SET u.name = $newName, u.role = $role, u.location = $location, u.website = $website`,
               {
                 oldName: selectedNode.name,
-                newName: editedNode.name,
-                role: editedNode.role,
-                location: editedNode.location,
+                newName: capitalizeWords(editedNode.name),
+                role: capitalizeWords(editedNode.role),
+                location: capitalizeWords(editedNode.location),
                 website: formattedWebsite, // Use the corrected website
               }
             );
