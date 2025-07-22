@@ -311,7 +311,7 @@ const NFCTrigger = ({ addNode }) => {
         // Always include mutated nodes in visibility if there was a mutation
         if (lastAction === 'mutation' && mutatedNodes.length > 0) {
           mutatedNodes.forEach(nodeName => {
-            const nodeNeighbors = getNDegreeNodes(nodeName, 0); // Always use 1 degree for mutations
+            const nodeNeighbors = getNDegreeNodes(nodeName, 0); // Always use 0 degree for mutations
             nodeNeighbors.forEach(neighbor => visibilityNodes.add(neighbor));
           });
         }
@@ -500,8 +500,6 @@ const NFCTrigger = ({ addNode }) => {
 
             // Check if the generated query is a mutation query (updates the graph)
             const isMutationQuery = /(CREATE|MERGE|SET|DELETE|REMOVE|DETACH DELETE)/i.test(generatedQuery.trim());
-            console.log('Generated query:', generatedQuery);
-            console.log('Is mutation query:', isMutationQuery);
             
             // If it's a mutation query, reload with the default MATCH query to show the updated graph
             if (isMutationQuery) {
@@ -521,7 +519,6 @@ const NFCTrigger = ({ addNode }) => {
               } else if (generatedQuery.includes('SET')) {
                 // For SET queries, extract from MATCH clause like MATCH (u:User {name: "John"}) SET u.role = 'admin'
                 const matchClause = generatedQuery.match(/MATCH\s*\([^)]*\{name:\s*['"]([^'"]+)['"][^}]*\}\)/i);
-                console.log('SET query match clause:', matchClause);
                 if (matchClause) {
                   extractedNodes = [matchClause[1]];
                 }
@@ -535,7 +532,6 @@ const NFCTrigger = ({ addNode }) => {
                   }).filter(Boolean) : [];
               }
               
-              console.log('Extracted nodes:', extractedNodes);
               setMutatedNodes(extractedNodes);
               setLastAction('mutation');
               
