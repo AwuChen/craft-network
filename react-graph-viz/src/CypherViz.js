@@ -440,12 +440,22 @@ const NFCTrigger = ({ addNode }) => {
             
             // If it's a mutation query, reload with the default MATCH query to show the updated graph
             if (isMutationQuery) {
+              // Extract the affected node name from the mutation query
+              let affectedNode = null;
+              if (generatedQuery.includes('CREATE') || generatedQuery.includes('MERGE')) {
+                // Try to extract node name from patterns like "CREATE (n:User {name: 'John'})" or "MERGE (n:User {name: 'John'})"
+                const nameMatch = generatedQuery.match(/name:\s*['"`]([^'"`]+)['"`]/i);
+                if (nameMatch) {
+                  affectedNode = nameMatch[1];
+                }
+              }
+              
               const defaultQuery = `
                 MATCH (u:User)-[r:CONNECTED_TO]->(v:User)
                 RETURN u.name AS source, u.role AS sourceRole, u.title AS sourceTitle, u.website AS sourceWebsite, 
                        v.name AS target, v.role AS targetRole, v.title AS targetTitle, v.website AS targetWebsite
               `;
-              await loadData(null, defaultQuery);
+              await loadData(affectedNode, defaultQuery);
             }
             
             } catch (error) {
