@@ -17,8 +17,8 @@ class CypherViz extends React.Component {
     this.state = {
       data: this.defaultData,
       query: `MATCH (u:User)-[r:CONNECTED_TO]->(v:User) 
-          RETURN u.name AS source, u.role AS sourceRole, u.title AS sourceTitle, u.website AS sourceWebsite, 
-      v.name AS target, v.role AS targetRole, v.title AS targetTitle, v.website AS targetWebsite`,
+          RETURN u.name AS source, u.role AS sourceRole, u.location AS sourceLocation, u.website AS sourceWebsite, 
+      v.name AS target, v.role AS targetRole, v.location AS targetLocation, v.website AS targetWebsite`,
       latestNode: null
     };
 
@@ -52,7 +52,7 @@ class CypherViz extends React.Component {
           nodesMap.set(source, {
             name: source,
             role: record.get("sourceRole"),
-            title: record.get("sourceTitle"),
+            location: record.get("sourceLocation"),
             website: record.get("sourceWebsite"),
             x: Math.random() * 500,
             y: Math.random() * 500,
@@ -63,7 +63,7 @@ class CypherViz extends React.Component {
           nodesMap.set(target, {
             name: target,
             role: record.get("targetRole"),
-            title: record.get("targetTitle"),
+            location: record.get("targetLocation"),
             website: record.get("targetWebsite"),
             x: Math.random() * 500,
             y: Math.random() * 500,
@@ -85,7 +85,7 @@ class CypherViz extends React.Component {
               nodesMap.set(name, {
                 name,
                 role: node.properties.role || "",
-                title: node.properties.title || "",
+                location: node.properties.location || "",
                 website: node.properties.website || "",
                 x: Math.random() * 500,
                 y: Math.random() * 500,
@@ -98,7 +98,7 @@ class CypherViz extends React.Component {
               nodesMap.set(name, {
                 name,
                 role: node.role || node.u_role || "",
-                title: node.title || node.u_title || "",
+                location: node.location || node.u_location || "",
                 website: node.website || node.u_website || "",
                 x: Math.random() * 500,
                 y: Math.random() * 500,
@@ -111,7 +111,7 @@ class CypherViz extends React.Component {
               nodesMap.set(name, {
                 name,
                 role: record.get(key.replace('name', 'role')) || "",
-                title: record.get(key.replace('name', 'title')) || "",
+                location: record.get(key.replace('name', 'location')) || "",
                 website: record.get(key.replace('name', 'website')) || "",
                 x: Math.random() * 500,
                 y: Math.random() * 500,
@@ -152,12 +152,12 @@ class CypherViz extends React.Component {
       await session.run(
         `MERGE (u:User {name: $user}) 
          ON CREATE SET u.role = 'affiliate', 
-                       u.title = '', 
+                       u.location = '', 
                        u.website = ''
 
          MERGE (nfc:User {name: $nfcUser}) 
          ON CREATE SET nfc.role = 'ambassador', 
-                       nfc.title = $nfcUser + "'s network", 
+                       nfc.location = $nfcUser + "'s network", 
                        nfc.website = ''
 
          MERGE (awu:User {name: $awuUser}) 
@@ -313,7 +313,7 @@ const NFCTrigger = ({ addNode }) => {
         if (inputValue && inputValue.trim()) {
           const searchMatches = data.nodes.filter(node => 
             node.name.toLowerCase().includes(inputValue.toLowerCase()) ||
-            (node.title && node.title.toLowerCase().includes(inputValue.toLowerCase())) ||
+            (node.location && node.location.toLowerCase().includes(inputValue.toLowerCase())) ||
             (node.role && node.role.toLowerCase().includes(inputValue.toLowerCase()))
           );
           searchMatches.forEach(match => {
@@ -334,7 +334,7 @@ const NFCTrigger = ({ addNode }) => {
                          (() => {
                            const searchMatches = data.nodes.filter(node => 
                              node.name.toLowerCase().includes(inputValue.toLowerCase()) ||
-                             (node.title && node.title.toLowerCase().includes(inputValue.toLowerCase())) ||
+                             (node.location && node.location.toLowerCase().includes(inputValue.toLowerCase())) ||
                              (node.role && node.role.toLowerCase().includes(inputValue.toLowerCase()))
                            );
                            const searchNodes = new Set();
@@ -551,8 +551,8 @@ const NFCTrigger = ({ addNode }) => {
               
               const defaultQuery = `
                 MATCH (u:User)-[r:CONNECTED_TO]->(v:User)
-                RETURN u.name AS source, u.role AS sourceRole, u.title AS sourceTitle, u.website AS sourceWebsite, 
-                       v.name AS target, v.role AS targetRole, v.title AS targetTitle, v.website AS targetWebsite
+                RETURN u.name AS source, u.role AS sourceRole, u.location AS sourceLocation, u.website AS sourceWebsite, 
+                       v.name AS target, v.role AS targetRole, v.location AS targetLocation, v.website AS targetWebsite
               `;
               await loadData(null, defaultQuery);
             }
@@ -602,12 +602,12 @@ const NFCTrigger = ({ addNode }) => {
           try {
             await session.run(
               `MATCH (u:User {name: $oldName}) 
-              SET u.name = $newName, u.role = $role, u.title = $title, u.website = $website`,
+              SET u.name = $newName, u.role = $role, u.location = $location, u.website = $website`,
               {
                 oldName: selectedNode.name,
                 newName: editedNode.name,
                 role: editedNode.role,
-                title: editedNode.title,
+                location: editedNode.location,
                 website: formattedWebsite, // Use the corrected website
               }
             );
@@ -625,7 +625,7 @@ return (
     <div width="95%">
       <form onSubmit={handleSubmit}>
         <textarea
-          placeholder="Enter natural language query, search for nodes..."
+          placeholder="Show me all the artist..."
           style={{ display: "block", width: "95%", height: "60px", margin: "0 auto", textAlign: "center" }}
           value={inputValue}
           onChange={handleInputChange}
@@ -639,7 +639,7 @@ return (
   ref={fgRef}
   graphData={data}
   nodeId="name"
-  nodeLabel={(node) => node.title || "No Title"}
+  nodeLabel={(node) => node.location || "No Location"}
   onNodeClick={handleNodeClick}
   onNodeHover={handleNodeHover}
   onBackgroundClick={() => {
@@ -652,7 +652,7 @@ return (
     const isHighlighted =
       inputValue &&
       (node.name.toLowerCase().includes(inputValue.toLowerCase()) ||
-        (node.title && node.title.toLowerCase().includes(inputValue.toLowerCase())) ||
+        (node.location && node.location.toLowerCase().includes(inputValue.toLowerCase())) ||
         (node.role && node.role.toLowerCase().includes(inputValue.toLowerCase())));
     const isOneDegree = oneDegreeNodes.has(node.name);
     const isNDegree = visibilityNodes.has(node.name);
@@ -704,14 +704,14 @@ return (
       onBlur={(e) => e.target.placeholder = "Enter name"} 
       /></p>
 
-      <p><strong>Title:</strong>
+      <p><strong>Location:</strong>
       <input 
-      name="title" 
-      value={editedNode.title} 
-      placeholder="Enter title" 
+      name="location" 
+      value={editedNode.location} 
+      placeholder="Enter location" 
       onChange={handleEditChange}
       onFocus={(e) => e.target.placeholder = ""}
-      onBlur={(e) => e.target.placeholder = "Enter title"} 
+      onBlur={(e) => e.target.placeholder = "Enter location"} 
       /></p>
 
       <p><strong>Role:</strong>
@@ -740,8 +740,8 @@ return (
       <>
       <h3>Network Info</h3>
       <p><strong>Name:</strong> {selectedNode?.name}</p>
-      <p><strong>Title:</strong> {selectedNode?.title}</p>
       <p><strong>Role:</strong> {selectedNode?.role}</p>
+      <p><strong>Location:</strong> {selectedNode?.location}</p>
       <p><strong>Website:</strong>{" "}
       {selectedNode.website && selectedNode.website !== "" ? (
         <a href={selectedNode.website} target="_blank" rel="noopener noreferrer">
