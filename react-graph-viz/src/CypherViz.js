@@ -78,7 +78,7 @@ class CypherViz extends React.Component {
         // fallback: node-only query
         record.keys.forEach((key) => {
           const node = record.get(key);
-          if (node.properties && node.identity) {
+          if (node && node.properties && node.identity) {
             const name = node.properties.name || `Node-${node.identity.low}`;
             if (!nodesMap.has(name)) {
               nodesMap.set(name, {
@@ -86,6 +86,19 @@ class CypherViz extends React.Component {
                 role: node.properties.role || "",
                 title: node.properties.title || "",
                 website: node.properties.website || "",
+                x: Math.random() * 500,
+                y: Math.random() * 500,
+              });
+            }
+          } else if (node && typeof node === 'object') {
+            // Handle SET query results that might have different structure
+            const name = node.name || node.u_name || `Node-${Date.now()}`;
+            if (!nodesMap.has(name)) {
+              nodesMap.set(name, {
+                name,
+                role: node.role || node.u_role || "",
+                title: node.title || node.u_title || "",
+                website: node.website || node.u_website || "",
                 x: Math.random() * 500,
                 y: Math.random() * 500,
               });
@@ -298,7 +311,7 @@ const NFCTrigger = ({ addNode }) => {
         // Always include mutated nodes in visibility if there was a mutation
         if (lastAction === 'mutation' && mutatedNodes.length > 0) {
           mutatedNodes.forEach(nodeName => {
-            const nodeNeighbors = getNDegreeNodes(nodeName, visibleDegree);
+            const nodeNeighbors = getNDegreeNodes(nodeName, 0); // Always use 1 degree for mutations
             nodeNeighbors.forEach(neighbor => visibilityNodes.add(neighbor));
           });
         }
@@ -317,15 +330,15 @@ const NFCTrigger = ({ addNode }) => {
                            });
                            return searchNodes;
                          })() : 
-                        lastAction === 'mutation' ?
-                        (() => {
-                          const mutationNodes = new Set();
-                          mutatedNodes.forEach(nodeName => {
-                            const nodeNeighbors = getNDegreeNodes(nodeName, visibleDegree);
-                            nodeNeighbors.forEach(neighbor => mutationNodes.add(neighbor));
-                          });
-                          return mutationNodes;
-                        })() :
+                         lastAction === 'mutation' ?
+                         (() => {
+                           const mutationNodes = new Set();
+                           mutatedNodes.forEach(nodeName => {
+                             const nodeNeighbors = getNDegreeNodes(nodeName, 1); // Always use 1 degree for mutations
+                             nodeNeighbors.forEach(neighbor => mutationNodes.add(neighbor));
+                           });
+                           return mutationNodes;
+                         })() :
                          getNDegreeNodes(zoomFocus, visibleDegree);
         
         // Auto-zoom to visible nodes
@@ -487,6 +500,8 @@ const NFCTrigger = ({ addNode }) => {
 
             // Check if the generated query is a mutation query (updates the graph)
             const isMutationQuery = /(CREATE|MERGE|SET|DELETE|REMOVE|DETACH DELETE)/i.test(generatedQuery.trim());
+            console.log('Generated query:', generatedQuery);
+            console.log('Is mutation query:', isMutationQuery);
             
             // If it's a mutation query, reload with the default MATCH query to show the updated graph
             if (isMutationQuery) {
@@ -495,7 +510,7 @@ const NFCTrigger = ({ addNode }) => {
               
               // Handle different mutation query patterns
               if (generatedQuery.includes('DELETE')) {
-                // For DELETE queries, extract from patterns like DELETE (n:User {name: "John"}) or MATCH (n:User {name: "John"}) DELETE n
+                // For DELETE queries, extract from patterns like DELETE (u:User {name: "John"}) or MATCH (u:User {name: "John"}) DELETE u
                 const deleteMatches = generatedQuery.match(/\{name:\s*['"]([^'"]+)['"]\}/g);
                 if (deleteMatches) {
                   extractedNodes = deleteMatches.map(match => {
@@ -503,8 +518,15 @@ const NFCTrigger = ({ addNode }) => {
                     return nameMatch ? nameMatch[1] : null;
                   }).filter(Boolean);
                 }
+              } else if (generatedQuery.includes('SET')) {
+                // For SET queries, extract from MATCH clause like MATCH (u:User {name: "John"}) SET u.role = 'admin'
+                const matchClause = generatedQuery.match(/MATCH\s*\([^)]*\{name:\s*['"]([^'"]+)['"][^}]*\}\)/i);
+                console.log('SET query match clause:', matchClause);
+                if (matchClause) {
+                  extractedNodes = [matchClause[1]];
+                }
               } else {
-                // For CREATE/MERGE/SET queries, extract from {name: "nodeName"} patterns
+                // For CREATE/MERGE queries, extract from {name: "nodeName"} patterns
                 const nodeMatches = generatedQuery.match(/\{([^}]+)\}/g);
                 extractedNodes = nodeMatches ? 
                   nodeMatches.map(match => {
@@ -513,6 +535,7 @@ const NFCTrigger = ({ addNode }) => {
                   }).filter(Boolean) : [];
               }
               
+              console.log('Extracted nodes:', extractedNodes);
               setMutatedNodes(extractedNodes);
               setLastAction('mutation');
               
