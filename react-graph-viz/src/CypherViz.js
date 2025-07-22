@@ -491,12 +491,27 @@ const NFCTrigger = ({ addNode }) => {
             // If it's a mutation query, reload with the default MATCH query to show the updated graph
             if (isMutationQuery) {
               // Extract node names from the mutation query to track what was created/modified
-              const nodeMatches = generatedQuery.match(/\{([^}]+)\}/g);
-              const extractedNodes = nodeMatches ? 
-                nodeMatches.map(match => {
-                  const nameMatch = match.match(/name:\s*['"]([^'"]+)['"]/);
-                  return nameMatch ? nameMatch[1] : null;
-                }).filter(Boolean) : [];
+              let extractedNodes = [];
+              
+              // Handle different mutation query patterns
+              if (generatedQuery.includes('DELETE')) {
+                // For DELETE queries, extract from patterns like DELETE (n:User {name: "John"}) or MATCH (n:User {name: "John"}) DELETE n
+                const deleteMatches = generatedQuery.match(/\{name:\s*['"]([^'"]+)['"]\}/g);
+                if (deleteMatches) {
+                  extractedNodes = deleteMatches.map(match => {
+                    const nameMatch = match.match(/name:\s*['"]([^'"]+)['"]/);
+                    return nameMatch ? nameMatch[1] : null;
+                  }).filter(Boolean);
+                }
+              } else {
+                // For CREATE/MERGE/SET queries, extract from {name: "nodeName"} patterns
+                const nodeMatches = generatedQuery.match(/\{([^}]+)\}/g);
+                extractedNodes = nodeMatches ? 
+                  nodeMatches.map(match => {
+                    const nameMatch = match.match(/name:\s*['"]([^'"]+)['"]/);
+                    return nameMatch ? nameMatch[1] : null;
+                  }).filter(Boolean) : [];
+              }
               
               setMutatedNodes(extractedNodes);
               setLastAction('mutation');
