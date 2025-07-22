@@ -42,7 +42,8 @@ class CypherViz extends React.Component {
 
     // Intelligent parser
     res.records.forEach((record) => {
-      if (record.has("source") && record.has("target")) {
+      if (record.has("source") && record.has("target") && record.get("source") && record.get("target") && 
+          typeof record.get("source") === 'string' && typeof record.get("target") === 'string') {
         // standard case
         let source = record.get("source");
         let target = record.get("target");
@@ -99,6 +100,19 @@ class CypherViz extends React.Component {
                 role: node.role || node.u_role || "",
                 title: node.title || node.u_title || "",
                 website: node.website || node.u_website || "",
+                x: Math.random() * 500,
+                y: Math.random() * 500,
+              });
+            }
+          } else if (typeof node === 'string' && key.includes('name')) {
+            // Handle direct string values from queries like RETURN u.name, u.role
+            const name = node;
+            if (!nodesMap.has(name)) {
+              nodesMap.set(name, {
+                name,
+                role: record.get(key.replace('name', 'role')) || "",
+                title: record.get(key.replace('name', 'title')) || "",
+                website: record.get(key.replace('name', 'website')) || "",
                 x: Math.random() * 500,
                 y: Math.random() * 500,
               });
