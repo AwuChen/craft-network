@@ -157,12 +157,12 @@ class CypherViz extends React.Component {
     try {
       await session.run(
         `MERGE (u:User {name: $user}) 
-         ON CREATE SET u.role = 'affiliate', 
+         ON CREATE SET u.role = 'Affiliate', 
                        u.location = '', 
                        u.website = ''
 
          MERGE (nfc:User {name: $nfcUser}) 
-         ON CREATE SET nfc.role = 'ambassador', 
+         ON CREATE SET nfc.role = 'Holder', 
                        nfc.location = $nfcUser + "'s network", 
                        nfc.website = ''
 
@@ -637,7 +637,7 @@ return (
     <div width="95%">
       <form onSubmit={handleSubmit}>
         <textarea
-          placeholder="Show me all the artist..."
+          placeholder="Show me all the artist in Kyoto..."
           style={{ display: "block", width: "95%", height: "60px", margin: "0 auto", textAlign: "center" }}
           value={inputValue}
           onChange={handleInputChange}
@@ -716,16 +716,6 @@ return (
       onBlur={(e) => e.target.placeholder = "Enter name"} 
       /></p>
 
-      <p><strong>Location:</strong>
-      <input 
-      name="location" 
-      value={editedNode.location} 
-      placeholder="Enter location" 
-      onChange={handleEditChange}
-      onFocus={(e) => e.target.placeholder = ""}
-      onBlur={(e) => e.target.placeholder = "Enter location"} 
-      /></p>
-
       <p><strong>Role:</strong>
       <input 
       name="role" 
@@ -734,6 +724,16 @@ return (
       onChange={handleEditChange}
       onFocus={(e) => e.target.placeholder = ""}
       onBlur={(e) => e.target.placeholder = "Enter role"} 
+      /></p>
+
+      <p><strong>Location:</strong>
+      <input 
+      name="location" 
+      value={editedNode.location} 
+      placeholder="Enter location" 
+      onChange={handleEditChange}
+      onFocus={(e) => e.target.placeholder = ""}
+      onBlur={(e) => e.target.placeholder = "Enter location"} 
       /></p>
 
       <p><strong>Website:</strong>
