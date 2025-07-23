@@ -64,7 +64,6 @@ class CypherViz extends React.Component {
     
     // Set new idle timeout (5 seconds of inactivity)
     this.idleTimeout = setTimeout(() => {
-      console.log("User is now idle");
       this.setState({ isUserActive: false });
     }, 5000); // 5 seconds of inactivity
   };
@@ -73,12 +72,10 @@ class CypherViz extends React.Component {
   checkIdleAndReturnToDefault = () => {
     // Don't interfere if a mutation is being processed
     if (this.state.processingMutation) {
-      console.log("Skipping idle check - mutation in progress");
       return;
     }
     
     if (this.state.customQueryActive && !this.state.isUserActive) {
-      console.log("User is idle, returning to default query");
       this.setState({ 
         customQueryActive: false, 
         customQueryTimeout: null 
@@ -178,23 +175,11 @@ class CypherViz extends React.Component {
     }
     
     try {
-      console.log("=== Query Execution Debug ===");
-      console.log("Query to execute:", queryToExecute.substring(0, 100) + "...");
-      console.log("Is custom query:", isCustomQuery);
-      console.log("Query override:", queryOverride);
-      console.log("New node name:", newNodeName);
-      
-      // Use the mutation detection from earlier
-      console.log("Is mutation query:", isMutationQuery);
-      
       res = await session.run(queryToExecute);
       
       // Handle mutations for ALL queries (not just custom ones)
       if (isMutationQuery) {
         // For mutation queries, immediately return to default query
-        console.log("=== MUTATION DETECTED ===");
-        console.log("Mutation query detected, immediately returning to default query");
-        console.log("Query type:", queryToExecute.trim().split(' ')[0]);
         
         // Force return to default state regardless of idle detection
         this.setState({ 
@@ -215,11 +200,9 @@ class CypherViz extends React.Component {
         }
         
         // Immediately reload with default query to show updated graph
-        console.log("Executing mutation reload with default query immediately");
         this.loadData(null, this.defaultQuery);
         this.setState({ processingMutation: false });
         this.mutationReloadTimeout = null;
-        console.log("=== MUTATION COMPLETED ===");
         
         // Reset user activity state after a short delay to allow idle detection to work normally
         setTimeout(() => {
@@ -230,7 +213,6 @@ class CypherViz extends React.Component {
         return;
       } else if (isCustomQuery) {
         // For non-mutation custom queries, activate custom query state
-        console.log("Custom query activated, will return to default when user is idle");
         this.setState({ customQueryActive: true });
         
         // Clear any existing timeout
@@ -362,11 +344,7 @@ class CypherViz extends React.Component {
     console.log("State nodes count:", this.state.data.nodes.length);
     console.log("State links count:", this.state.data.links.length);
     
-    if (hasChanged || hasDetailedChange) {
-      console.log("Graph data has changed, updating...");
-    } else {
-      console.log("No changes detected, skipping update");
-    }
+
 
     localStorage.setItem("graphData", JSON.stringify(updatedData));
     
@@ -382,7 +360,6 @@ class CypherViz extends React.Component {
       this.lastDataHash = currentDataHash;
       this.lastUpdateTime = now;
       this.updateCount++;
-      console.log("Updating state after", timeSinceLastUpdate, "ms (update #", this.updateCount, ")");
       
       this.setState({ 
         data: updatedData, 
@@ -393,7 +370,6 @@ class CypherViz extends React.Component {
         setTimeout(() => {
           let newNode = nodes.find((n) => n.name === newNodeName);
           if (newNode && this.fgRef.current) {
-            console.log("Focusing on:", newNode);
             this.fgRef.current.centerAt(newNode.x, newNode.y, 1500);
             this.fgRef.current.zoom(1.25);
           }
@@ -474,7 +450,6 @@ class CypherViz extends React.Component {
       if (!document.hidden) {
         // Use default query for polling, but respect custom query state and mutation processing
         if (this.state.customQueryActive || this.state.processingMutation) {
-          console.log("Skipping poll - custom query active or mutation processing");
           return;
         }
         this.loadData(null, this.defaultQuery);
@@ -487,7 +462,6 @@ class CypherViz extends React.Component {
     }
     this.updateCountResetInterval = setInterval(() => {
       this.updateCount = 0;
-      console.log("Reset update count");
     }, 30000);
   };
 
@@ -511,20 +485,17 @@ class CypherViz extends React.Component {
       this.websocket = new WebSocket('wss://your-websocket-server.com');
       
       this.websocket.onopen = () => {
-        console.log('WebSocket connected');
         this.setState({ wsConnected: true, useWebSocket: true });
       };
       
       this.websocket.onmessage = (event) => {
         const message = JSON.parse(event.data);
         if (message.type === 'graph_update') {
-          console.log('Received graph update via WebSocket');
           this.loadData(null, this.defaultQuery); // Reload data when update is received
         }
       };
       
       this.websocket.onclose = () => {
-        console.log('WebSocket disconnected');
         this.setState({ wsConnected: false });
         // Fallback to polling if WebSocket fails
         setTimeout(() => {
@@ -565,11 +536,7 @@ class CypherViz extends React.Component {
     
     // Add visibility change listener to pause polling when tab is not active
     this.handleVisibilityChange = () => {
-      if (document.hidden && this.state.isPolling) {
-        console.log('Tab hidden, pausing polling');
-      } else if (!document.hidden && this.state.isPolling) {
-        console.log('Tab visible, resuming polling');
-      }
+      // Tab visibility change handling
     };
     
     document.addEventListener('visibilitychange', this.handleVisibilityChange);
@@ -711,19 +678,13 @@ class CypherViz extends React.Component {
       <Routes>
       <Route path="/:username" element={<NFCTrigger addNode={this.addNodeNFC} />} />
       <Route path="/" element={
-        <GraphView 
+                <GraphView 
         data={this.state.data} 
         handleChange={this.handleChange} 
         loadData={this.loadData} 
         fgRef={this.fgRef} 
         latestNode={this.state.latestNode} 
-    driver={this.driver} // Pass the driver
-        isPolling={this.state.isPolling}
-        lastUpdateTime={this.state.lastUpdateTime}
-        startPolling={this.startPolling}
-        stopPolling={this.stopPolling}
-        customQueryActive={this.state.customQueryActive}
-        resetQuery={this.resetQuery}
+        driver={this.driver} // Pass the driver
         processingMutation={this.state.processingMutation}
         updateUserActivity={this.updateUserActivity}
         isUserActive={this.state.isUserActive}
@@ -762,7 +723,7 @@ const NFCTrigger = ({ addNode }) => {
         return <div style={{ textAlign: "center", padding: "20px", fontSize: "16px", color: "red" }}>Processing NFC tap for {username}...</div>
       };
 
-              const GraphView = ({ data, handleChange, loadData, fgRef, latestNode, driver, isPolling, lastUpdateTime, startPolling, stopPolling, customQueryActive, resetQuery, processingMutation, updateUserActivity, isUserActive }) => {
+              const GraphView = ({ data, handleChange, loadData, fgRef, latestNode, driver, processingMutation, updateUserActivity, isUserActive }) => {
         const [inputValue, setInputValue] = useState(""); 
         const [selectedNode, setSelectedNode] = useState(null);
         const [editedNode, setEditedNode] = useState(null);
@@ -1182,61 +1143,8 @@ return (
       </form>
       <button id="visualize" onClick={() => window.open("https://awuchen.github.io/craft-network-3d/", "_blank")}>Visualize3D</button>
       <button id="info" onClick={() => window.open("https://www.hako.soooul.xyz/drafts/washi", "_blank")}>Info</button>
-      <button 
-        id="toggle-polling" 
-        onClick={() => isPolling ? stopPolling() : startPolling()}
-        style={{ 
-          backgroundColor: isPolling ? "#f44336" : "#4CAF50",
-          color: "white",
-          border: "none",
-          padding: "8px 16px",
-          borderRadius: "4px",
-          cursor: "pointer"
-        }}
-      >
-        {isPolling ? "Pause Updates" : "Resume Updates"}
-      </button>
       
-      {/* Custom query indicator and reset button */}
-      {customQueryActive && (
-        <div style={{
-          position: "fixed",
-          top: "60px",
-          right: "10px",
-          padding: "8px 12px",
-          backgroundColor: isUserActive ? "#FF9800" : "#FF5722",
-          color: "white",
-          borderRadius: "4px",
-          fontSize: "12px",
-          zIndex: 1000,
-          display: "flex",
-          alignItems: "center",
-          gap: "8px"
-        }}>
-          <div style={{
-            width: "8px",
-            height: "8px",
-            borderRadius: "50%",
-            backgroundColor: "#fff",
-            animation: isUserActive ? "pulse 1s infinite" : "pulse 0.5s infinite"
-          }}></div>
-          {isUserActive ? "Custom Query Active" : "Returning to Default..."}
-          <button
-            onClick={resetQuery}
-            style={{
-              backgroundColor: "transparent",
-              color: "white",
-              border: "1px solid white",
-              borderRadius: "2px",
-              padding: "2px 6px",
-              fontSize: "10px",
-              cursor: "pointer"
-            }}
-          >
-            Reset
-          </button>
-        </div>
-      )}
+
       
       {/* Mutation processing indicator */}
       {processingMutation && (
@@ -1265,35 +1173,7 @@ return (
         </div>
       )}
       
-      {/* Real-time update status indicator */}
-      <div style={{ 
-        position: "fixed", 
-        top: "10px", 
-        right: "10px", 
-        padding: "8px 12px", 
-        backgroundColor: isPolling ? "#4CAF50" : "#f44336", 
-        color: "white", 
-        borderRadius: "4px", 
-        fontSize: "12px",
-        zIndex: 1000,
-        display: "flex",
-        alignItems: "center",
-        gap: "8px"
-      }}>
-        <div style={{ 
-          width: "8px", 
-          height: "8px", 
-          borderRadius: "50%", 
-          backgroundColor: isPolling ? "#fff" : "#ccc",
-          animation: isPolling ? "pulse 2s infinite" : "none"
-        }}></div>
-        {isPolling ? "Live Updates Active" : "Updates Paused"}
-        {lastUpdateTime && (
-          <span style={{ fontSize: "10px", opacity: 0.8 }}>
-            (Last: {new Date(lastUpdateTime).toLocaleTimeString()})
-          </span>
-        )}
-      </div>
+
       
       <style>{`
         @keyframes pulse {
