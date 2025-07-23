@@ -25,7 +25,10 @@ class CypherViz extends React.Component {
       useWebSocket: false,
       wsConnected: false,
       customQueryActive: false,
-      customQueryTimeout: null
+      customQueryTimeout: null,
+      processingMutation: false,
+      lastUserActivity: Date.now(),
+      isUserActive: true
     };
 
     // Store the default query for polling (separate from user input)
@@ -41,7 +44,86 @@ class CypherViz extends React.Component {
     this.updateDebounceTime = 2000; // 2 seconds debounce
     this.updateCount = 0;
     this.maxUpdatesPerCycle = 3; // Prevent infinite loops
+    this.mutationReloadTimeout = null;
+    this.idleTimeout = null;
+    this.idleCheckInterval = null;
   }
+
+  // Update user activity timestamp
+  updateUserActivity = () => {
+    const now = Date.now();
+    this.setState({ 
+      lastUserActivity: now,
+      isUserActive: true 
+    });
+    
+    // Clear existing idle timeout
+    if (this.idleTimeout) {
+      clearTimeout(this.idleTimeout);
+    }
+    
+    // Set new idle timeout (5 seconds of inactivity)
+    this.idleTimeout = setTimeout(() => {
+      console.log("User is now idle");
+      this.setState({ isUserActive: false });
+    }, 5000); // 5 seconds of inactivity
+  };
+
+  // Check if user is idle and should return to default query
+  checkIdleAndReturnToDefault = () => {
+    if (this.state.customQueryActive && !this.state.isUserActive) {
+      console.log("User is idle, returning to default query");
+      this.setState({ 
+        customQueryActive: false, 
+        customQueryTimeout: null 
+      });
+      
+      // Clear any existing timeout
+      if (this.state.customQueryTimeout) {
+        clearTimeout(this.state.customQueryTimeout);
+      }
+      
+      // Reload with default query
+      this.loadData(null, this.defaultQuery);
+    }
+  };
+
+  // Start idle detection system
+  startIdleDetection = () => {
+    // Set up activity listeners
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    activityEvents.forEach(event => {
+      document.addEventListener(event, this.updateUserActivity, true);
+    });
+    
+    // Check for idle state every 2 seconds
+    this.idleCheckInterval = setInterval(() => {
+      this.checkIdleAndReturnToDefault();
+    }, 2000);
+    
+    // Initial activity update
+    this.updateUserActivity();
+  };
+
+  // Stop idle detection
+  stopIdleDetection = () => {
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    activityEvents.forEach(event => {
+      document.removeEventListener(event, this.updateUserActivity, true);
+    });
+    
+    if (this.idleCheckInterval) {
+      clearInterval(this.idleCheckInterval);
+      this.idleCheckInterval = null;
+    }
+    
+    if (this.idleTimeout) {
+      clearTimeout(this.idleTimeout);
+      this.idleTimeout = null;
+    }
+  };
 
   loadData = async (newNodeName = null, queryOverride = null) => {
     let session = this.driver.session({ database: "neo4j" });
@@ -82,12 +164,49 @@ class CypherViz extends React.Component {
     }
     
     try {
-      console.log("Executing query:", queryToExecute.substring(0, 100) + "...");
+      console.log("=== Query Execution Debug ===");
+      console.log("Query to execute:", queryToExecute.substring(0, 100) + "...");
       console.log("Is custom query:", isCustomQuery);
+      console.log("Query override:", queryOverride);
+      console.log("New node name:", newNodeName);
+      
+      // Check if this is a mutation query
+      const isMutationQuery = /(CREATE|MERGE|SET|DELETE|REMOVE|DETACH DELETE)/i.test(queryToExecute.trim());
+      console.log("Is mutation query:", isMutationQuery);
+      
       res = await session.run(queryToExecute);
       
-      // If this was a custom query, set a timeout to return to default
-      if (isCustomQuery) {
+      // Handle mutations for ALL queries (not just custom ones)
+      if (isMutationQuery) {
+        // For mutation queries, immediately return to default query
+        console.log("Mutation query detected, immediately returning to default query");
+        this.setState({ 
+          customQueryActive: false, 
+          customQueryTimeout: null,
+          processingMutation: true
+        });
+        
+        // Clear any existing timeout
+        if (this.state.customQueryTimeout) {
+          clearTimeout(this.state.customQueryTimeout);
+        }
+        
+        // Prevent multiple mutation reloads
+        if (this.mutationReloadTimeout) {
+          clearTimeout(this.mutationReloadTimeout);
+        }
+        
+        // Reload with default query to show updated graph
+        console.log("Setting up mutation reload timeout...");
+        this.mutationReloadTimeout = setTimeout(() => {
+          console.log("Executing mutation reload with default query");
+          this.loadData(null, this.defaultQuery);
+          this.setState({ processingMutation: false });
+          this.mutationReloadTimeout = null;
+        }, 1000); // Small delay to ensure mutation is complete
+      } else if (isCustomQuery) {
+        // For non-mutation custom queries, activate custom query state
+        console.log("Custom query activated, will return to default when user is idle");
         this.setState({ customQueryActive: true });
         
         // Clear any existing timeout
@@ -95,16 +214,8 @@ class CypherViz extends React.Component {
           clearTimeout(this.state.customQueryTimeout);
         }
         
-        // Set timeout to return to default query after 30 seconds
-        const timeout = setTimeout(() => {
-          console.log("Returning to default query after custom query timeout");
-          this.setState({ 
-            customQueryActive: false, 
-            customQueryTimeout: null 
-          });
-        }, 30000); // 30 seconds
-        
-        this.setState({ customQueryTimeout: timeout });
+        // Update user activity to reset idle timer
+        this.updateUserActivity();
       }
     } catch (err) {
       console.error("Neo4j query failed:", err);
@@ -337,9 +448,9 @@ class CypherViz extends React.Component {
     this.pollingInterval = setInterval(() => {
       // Only poll if the tab is active (to save resources)
       if (!document.hidden) {
-        // Use default query for polling, but respect custom query state
-        if (this.state.customQueryActive) {
-          console.log("Skipping poll - custom query active");
+        // Use default query for polling, but respect custom query state and mutation processing
+        if (this.state.customQueryActive || this.state.processingMutation) {
+          console.log("Skipping poll - custom query active or mutation processing");
           return;
         }
         this.loadData(null, this.defaultQuery);
@@ -438,6 +549,9 @@ class CypherViz extends React.Component {
     };
     
     document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    
+    // Start idle detection
+    this.startIdleDetection();
   }
 
   componentWillUnmount() {
@@ -449,6 +563,18 @@ class CypherViz extends React.Component {
     if (this.state.customQueryTimeout) {
       clearTimeout(this.state.customQueryTimeout);
     }
+    
+    // Clear mutation reload timeout
+    if (this.mutationReloadTimeout) {
+      clearTimeout(this.mutationReloadTimeout);
+      this.mutationReloadTimeout = null;
+    }
+    
+    // Clear processing mutation state
+    this.setState({ processingMutation: false });
+    
+    // Stop idle detection
+    this.stopIdleDetection();
     
     // Remove visibility change listener
     if (this.handleVisibilityChange) {
@@ -522,7 +648,8 @@ class CypherViz extends React.Component {
     this.setState({ 
       query: this.defaultQuery,
       customQueryActive: false,
-      customQueryTimeout: null
+      customQueryTimeout: null,
+      processingMutation: false
     });
     
     // Clear any existing timeout
@@ -573,6 +700,9 @@ class CypherViz extends React.Component {
         stopPolling={this.stopPolling}
         customQueryActive={this.state.customQueryActive}
         resetQuery={this.resetQuery}
+        processingMutation={this.state.processingMutation}
+        updateUserActivity={this.updateUserActivity}
+        isUserActive={this.state.isUserActive}
     />
   } />
   </Routes>
@@ -608,7 +738,7 @@ const NFCTrigger = ({ addNode }) => {
         return <div style={{ textAlign: "center", padding: "20px", fontSize: "16px", color: "red" }}>Processing NFC tap for {username}...</div>
       };
 
-              const GraphView = ({ data, handleChange, loadData, fgRef, latestNode, driver, isPolling, lastUpdateTime, startPolling, stopPolling, customQueryActive, resetQuery }) => {
+              const GraphView = ({ data, handleChange, loadData, fgRef, latestNode, driver, isPolling, lastUpdateTime, startPolling, stopPolling, customQueryActive, resetQuery, processingMutation, updateUserActivity, isUserActive }) => {
         const [inputValue, setInputValue] = useState(""); 
         const [selectedNode, setSelectedNode] = useState(null);
         const [editedNode, setEditedNode] = useState(null);
@@ -864,6 +994,10 @@ const NFCTrigger = ({ addNode }) => {
           const input = event.target.value;
           setInputValue(input);
           handleChange(event); // updates CypherViz state.query too
+          
+          // Update user activity when typing
+          updateUserActivity();
+          
           // Clear other actions when searching
           if (input.trim()) {
             setClickedNode(null);
@@ -946,6 +1080,10 @@ const NFCTrigger = ({ addNode }) => {
           setFocusNode(node.name);
           setClickedNode(node.name);
           setLastAction('click');
+          
+          // Update user activity when clicking nodes
+          updateUserActivity();
+          
           // Clear search when clicking a node to avoid zoom conflicts
           setInputValue("");
         };
@@ -1039,7 +1177,7 @@ return (
           top: "60px",
           right: "10px",
           padding: "8px 12px",
-          backgroundColor: "#FF9800",
+          backgroundColor: isUserActive ? "#FF9800" : "#FF5722",
           color: "white",
           borderRadius: "4px",
           fontSize: "12px",
@@ -1053,9 +1191,9 @@ return (
             height: "8px",
             borderRadius: "50%",
             backgroundColor: "#fff",
-            animation: "pulse 1s infinite"
+            animation: isUserActive ? "pulse 1s infinite" : "pulse 0.5s infinite"
           }}></div>
-          Custom Query Active
+          {isUserActive ? "Custom Query Active" : "Returning to Default..."}
           <button
             onClick={resetQuery}
             style={{
@@ -1070,6 +1208,33 @@ return (
           >
             Reset
           </button>
+        </div>
+      )}
+      
+      {/* Mutation processing indicator */}
+      {processingMutation && (
+        <div style={{
+          position: "fixed",
+          top: "60px",
+          right: "10px",
+          padding: "8px 12px",
+          backgroundColor: "#9C27B0",
+          color: "white",
+          borderRadius: "4px",
+          fontSize: "12px",
+          zIndex: 1000,
+          display: "flex",
+          alignItems: "center",
+          gap: "8px"
+        }}>
+          <div style={{
+            width: "8px",
+            height: "8px",
+            borderRadius: "50%",
+            backgroundColor: "#fff",
+            animation: "pulse 0.5s infinite"
+          }}></div>
+          Processing Mutation...
         </div>
       )}
       
