@@ -19,18 +19,96 @@ class CypherViz extends React.Component {
       query: `MATCH (u:User)-[r:CONNECTED_TO]->(v:User) 
           RETURN u.name AS source, u.role AS sourceRole, u.location AS sourceLocation, u.website AS sourceWebsite, 
       v.name AS target, v.role AS targetRole, v.location AS targetLocation, v.website AS targetWebsite`,
-      latestNode: null
+      latestNode: null,
+      lastUpdateTime: null,
+      isPolling: false,
+      useWebSocket: false,
+      wsConnected: false,
+      customQueryActive: false,
+      customQueryTimeout: null
     };
 
+    // Store the default query for polling (separate from user input)
+    this.defaultQuery = `MATCH (u:User)-[r:CONNECTED_TO]->(v:User) 
+        RETURN u.name AS source, u.role AS sourceRole, u.location AS sourceLocation, u.website AS sourceWebsite, 
+        v.name AS target, v.role AS targetRole, v.location AS targetLocation, v.website AS targetWebsite`;
+
+    // Store the last known data hash for change detection
+    this.lastDataHash = null;
+    this.pollingInterval = null;
+    this.websocket = null;
+    this.lastUpdateTime = 0;
+    this.updateDebounceTime = 2000; // 2 seconds debounce
+    this.updateCount = 0;
+    this.maxUpdatesPerCycle = 3; // Prevent infinite loops
   }
 
   loadData = async (newNodeName = null, queryOverride = null) => {
     let session = this.driver.session({ database: "neo4j" });
     let res;
+    
+    // Determine which query to use
+    let queryToExecute = queryOverride;
+    let isCustomQuery = false;
+    
+    if (!queryToExecute) {
+      // For polling, use default query unless a custom query is active
+      if (newNodeName === null && !queryOverride && !this.state.customQueryActive) {
+        queryToExecute = this.defaultQuery;
+      } else {
+        // For user-initiated queries, use state.query but validate it
+        queryToExecute = this.state.query;
+        isCustomQuery = true;
+      }
+    } else if (queryOverride !== this.defaultQuery) {
+      // If a custom query is being executed
+      isCustomQuery = true;
+    }
+    
+    // Validate the query
+    if (!queryToExecute || typeof queryToExecute !== 'string' || queryToExecute.trim() === '') {
+      console.error("Invalid query:", queryToExecute);
+      return;
+    }
+    
+    // Check if query starts with valid Cypher keywords
+    const validStartKeywords = ['MATCH', 'CREATE', 'MERGE', 'DELETE', 'SET', 'RETURN', 'WITH', 'UNWIND', 'CALL'];
+    const queryStart = queryToExecute.trim().toUpperCase();
+    const isValidQuery = validStartKeywords.some(keyword => queryStart.startsWith(keyword));
+    
+    if (!isValidQuery) {
+      console.error("Invalid Cypher query format:", queryToExecute);
+      return;
+    }
+    
     try {
-      res = await session.run(queryOverride || this.state.query);
+      console.log("Executing query:", queryToExecute.substring(0, 100) + "...");
+      console.log("Is custom query:", isCustomQuery);
+      res = await session.run(queryToExecute);
+      
+      // If this was a custom query, set a timeout to return to default
+      if (isCustomQuery) {
+        this.setState({ customQueryActive: true });
+        
+        // Clear any existing timeout
+        if (this.state.customQueryTimeout) {
+          clearTimeout(this.state.customQueryTimeout);
+        }
+        
+        // Set timeout to return to default query after 30 seconds
+        const timeout = setTimeout(() => {
+          console.log("Returning to default query after custom query timeout");
+          this.setState({ 
+            customQueryActive: false, 
+            customQueryTimeout: null 
+          });
+        }, 30000); // 30 seconds
+        
+        this.setState({ customQueryTimeout: timeout });
+      }
     } catch (err) {
       console.error("Neo4j query failed:", err);
+      console.error("Query was:", queryToExecute);
       this.setState({ data: { nodes: [], links: [] } });
       return;
     } finally {
@@ -125,25 +203,257 @@ class CypherViz extends React.Component {
     const nodes = Array.from(nodesMap.values());
     const updatedData = { nodes, links };
 
+    // Calculate hash of current data for change detection
+    const currentDataHash = this.calculateDataHash(updatedData);
+    const hasChanged = this.lastDataHash !== currentDataHash;
+    
+    // Also use more detailed change detection
+    const hasDetailedChange = this.hasDataChanged(updatedData, this.state.data);
+    
+    // Additional check: if the data is exactly the same, don't update
+    const isDataIdentical = JSON.stringify(updatedData) === JSON.stringify(this.state.data);
+    
+    // Store a reference to the current state data for next comparison
+    const currentStateData = this.state.data;
+    
+    console.log("=== Change Detection Debug ===");
+    console.log("Current hash:", currentDataHash);
+    console.log("Last hash:", this.lastDataHash);
+    console.log("Hash changed:", hasChanged);
+    console.log("Detailed change detected:", hasDetailedChange);
+    console.log("Data identical:", isDataIdentical);
+    console.log("Current nodes count:", updatedData.nodes.length);
+    console.log("Current links count:", updatedData.links.length);
+    console.log("State nodes count:", this.state.data.nodes.length);
+    console.log("State links count:", this.state.data.links.length);
+    
+    if (hasChanged || hasDetailedChange) {
+      console.log("Graph data has changed, updating...");
+    } else {
+      console.log("No changes detected, skipping update");
+    }
+
     localStorage.setItem("graphData", JSON.stringify(updatedData));
-    this.setState({ data: updatedData, latestNode: newNodeName }, () => {
-      if (newNodeName) {
-        setTimeout(() => {
-          let newNode = nodes.find((n) => n.name === newNodeName);
-          if (newNode && this.fgRef.current) {
-            console.log("Focusing on:", newNode);
-            this.fgRef.current.centerAt(newNode.x, newNode.y, 1500);
-            this.fgRef.current.zoom(1.25);
-          }
-        }, 2000);
+    
+    // Only update state if there's a change or if it's the initial load
+    const now = Date.now();
+    const timeSinceLastUpdate = now - this.lastUpdateTime;
+    
+    if ((hasChanged || hasDetailedChange || this.lastDataHash === null) && 
+        !isDataIdentical &&
+        (timeSinceLastUpdate > this.updateDebounceTime || this.lastDataHash === null) &&
+        this.updateCount < this.maxUpdatesPerCycle) {
+      // Update the hash only when we actually update the state
+      this.lastDataHash = currentDataHash;
+      this.lastUpdateTime = now;
+      this.updateCount++;
+      console.log("Updating state after", timeSinceLastUpdate, "ms (update #", this.updateCount, ")");
+      
+      this.setState({ 
+        data: updatedData, 
+        latestNode: newNodeName,
+        lastUpdateTime: hasChanged ? now : this.state.lastUpdateTime
+      }, () => {
+        if (newNodeName) {
+          setTimeout(() => {
+            let newNode = nodes.find((n) => n.name === newNodeName);
+            if (newNode && this.fgRef.current) {
+              console.log("Focusing on:", newNode);
+              this.fgRef.current.centerAt(newNode.x, newNode.y, 1500);
+              this.fgRef.current.zoom(1.25);
+            }
+          }, 2000);
+        }
+      });
+    } else {
+      // Even if no change, we might need to update latestNode for new additions
+      if (newNodeName && this.state.latestNode !== newNodeName) {
+        this.setState({ latestNode: newNodeName });
       }
-    });
+      // Reset update count when no changes are detected
+      this.updateCount = 0;
+    }
   };
 
+  // Calculate a simple hash of the graph data for change detection
+  calculateDataHash = (data) => {
+    // Only hash the actual data, not the random coordinates
+    const nodesStr = data.nodes.map(n => `${n.name}:${n.role}:${n.location}:${n.website}`).sort().join('|');
+    const linksStr = data.links.map(l => {
+      const source = typeof l.source === 'object' ? l.source.name : l.source;
+      const target = typeof l.target === 'object' ? l.target.name : l.target;
+      return `${source}:${target}`;
+    }).sort().join('|');
+    return `${nodesStr}|${linksStr}`;
+  };
 
+  // More detailed change detection
+  hasDataChanged = (newData, oldData) => {
+    if (!oldData || !oldData.nodes || !oldData.links) return true;
+    
+    // Check if number of nodes or links changed
+    if (newData.nodes.length !== oldData.nodes.length || 
+        newData.links.length !== oldData.links.length) {
+      return true;
+    }
+    
+    // Check if any node properties changed
+    const oldNodesMap = new Map(oldData.nodes.map(n => [n.name, n]));
+    for (const newNode of newData.nodes) {
+      const oldNode = oldNodesMap.get(newNode.name);
+      if (!oldNode || 
+          oldNode.role !== newNode.role || 
+          oldNode.location !== newNode.location || 
+          oldNode.website !== newNode.website) {
+        return true;
+      }
+    }
+    
+    // Check if any links changed
+    const oldLinksSet = new Set(oldData.links.map(l => {
+      const source = typeof l.source === 'object' ? l.source.name : l.source;
+      const target = typeof l.target === 'object' ? l.target.name : l.target;
+      return `${source}:${target}`;
+    }));
+    
+    for (const newLink of newData.links) {
+      const source = typeof newLink.source === 'object' ? newLink.source.name : newLink.source;
+      const target = typeof newLink.target === 'object' ? newLink.target.name : newLink.target;
+      if (!oldLinksSet.has(`${source}:${target}`)) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
 
+  // Start polling for changes
+  startPolling = () => {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+    }
+    
+    this.setState({ isPolling: true });
+    this.pollingInterval = setInterval(() => {
+      // Only poll if the tab is active (to save resources)
+      if (!document.hidden) {
+        // Use default query for polling, but respect custom query state
+        if (this.state.customQueryActive) {
+          console.log("Skipping poll - custom query active");
+          return;
+        }
+        this.loadData(null, this.defaultQuery);
+      }
+    }, 5000); // Check every 5 seconds
+    
+    // Reset update count every 30 seconds to prevent permanent blocking
+    if (this.updateCountResetInterval) {
+      clearInterval(this.updateCountResetInterval);
+    }
+    this.updateCountResetInterval = setInterval(() => {
+      this.updateCount = 0;
+      console.log("Reset update count");
+    }, 30000);
+  };
+
+  // Stop polling
+  stopPolling = () => {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+    }
+    if (this.updateCountResetInterval) {
+      clearInterval(this.updateCountResetInterval);
+      this.updateCountResetInterval = null;
+    }
+    this.setState({ isPolling: false });
+  };
+
+  // WebSocket methods for real-time updates
+  connectWebSocket = () => {
+    try {
+      // Replace with your WebSocket server URL
+      this.websocket = new WebSocket('wss://your-websocket-server.com');
+      
+      this.websocket.onopen = () => {
+        console.log('WebSocket connected');
+        this.setState({ wsConnected: true, useWebSocket: true });
+      };
+      
+      this.websocket.onmessage = (event) => {
+        const message = JSON.parse(event.data);
+        if (message.type === 'graph_update') {
+          console.log('Received graph update via WebSocket');
+          this.loadData(null, this.defaultQuery); // Reload data when update is received
+        }
+      };
+      
+      this.websocket.onclose = () => {
+        console.log('WebSocket disconnected');
+        this.setState({ wsConnected: false });
+        // Fallback to polling if WebSocket fails
+        setTimeout(() => {
+          if (!this.state.isPolling) {
+            this.startPolling();
+          }
+        }, 5000);
+      };
+      
+      this.websocket.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        this.setState({ wsConnected: false });
+      };
+    } catch (error) {
+      console.error('Failed to connect WebSocket:', error);
+      // Fallback to polling
+      this.startPolling();
+    }
+  };
+
+  disconnectWebSocket = () => {
+    if (this.websocket) {
+      this.websocket.close();
+      this.websocket = null;
+    }
+    this.setState({ wsConnected: false, useWebSocket: false });
+  };
+
+  // Enhanced componentDidMount to try WebSocket first, then fallback to polling
   componentDidMount() {
+    // Validate and clean the query state first
+    this.validateAndCleanQuery();
+    
     this.loadData();
+    
+    // Try WebSocket first, fallback to polling
+    this.connectWebSocket();
+    
+    // Add visibility change listener to pause polling when tab is not active
+    this.handleVisibilityChange = () => {
+      if (document.hidden && this.state.isPolling) {
+        console.log('Tab hidden, pausing polling');
+      } else if (!document.hidden && this.state.isPolling) {
+        console.log('Tab visible, resuming polling');
+      }
+    };
+    
+    document.addEventListener('visibilitychange', this.handleVisibilityChange);
+  }
+
+  componentWillUnmount() {
+    // Clean up both polling and WebSocket
+    this.stopPolling();
+    this.disconnectWebSocket();
+    
+    // Clear custom query timeout
+    if (this.state.customQueryTimeout) {
+      clearTimeout(this.state.customQueryTimeout);
+    }
+    
+    // Remove visibility change listener
+    if (this.handleVisibilityChange) {
+      document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    }
   }
 
   addNodeNFC = async (newUser, nfcUserName) => {
@@ -185,7 +495,62 @@ class CypherViz extends React.Component {
   };
 
   handleChange = (event) => {
-    this.setState({ query: event.target.value });
+    // Only update the query state if it's a valid Cypher query or empty
+    const newQuery = event.target.value;
+    
+    // Allow empty queries (for clearing)
+    if (!newQuery || newQuery.trim() === '') {
+      this.setState({ query: this.defaultQuery });
+      return;
+    }
+    
+    // Check if it starts with valid Cypher keywords
+    const validStartKeywords = ['MATCH', 'CREATE', 'MERGE', 'DELETE', 'SET', 'RETURN', 'WITH', 'UNWIND', 'CALL'];
+    const queryStart = newQuery.trim().toUpperCase();
+    const isValidQuery = validStartKeywords.some(keyword => queryStart.startsWith(keyword));
+    
+    if (isValidQuery) {
+      this.setState({ query: newQuery });
+    } else {
+      // If invalid, don't update the query state
+      console.log("Invalid Cypher query format, not updating state:", newQuery);
+    }
+  };
+
+  // Method to reset query to default
+  resetQuery = () => {
+    this.setState({ 
+      query: this.defaultQuery,
+      customQueryActive: false,
+      customQueryTimeout: null
+    });
+    
+    // Clear any existing timeout
+    if (this.state.customQueryTimeout) {
+      clearTimeout(this.state.customQueryTimeout);
+    }
+  };
+
+  // Method to validate and clean the current query state
+  validateAndCleanQuery = () => {
+    const currentQuery = this.state.query;
+    
+    // Check if current query is valid
+    if (!currentQuery || typeof currentQuery !== 'string' || currentQuery.trim() === '') {
+      console.log("Resetting invalid query to default");
+      this.setState({ query: this.defaultQuery });
+      return;
+    }
+    
+    // Check if it starts with valid Cypher keywords
+    const validStartKeywords = ['MATCH', 'CREATE', 'MERGE', 'DELETE', 'SET', 'RETURN', 'WITH', 'UNWIND', 'CALL'];
+    const queryStart = currentQuery.trim().toUpperCase();
+    const isValidQuery = validStartKeywords.some(keyword => queryStart.startsWith(keyword));
+    
+    if (!isValidQuery) {
+      console.log("Resetting invalid query to default:", currentQuery);
+      this.setState({ query: this.defaultQuery });
+    }
   };
 
   render() {
@@ -201,7 +566,13 @@ class CypherViz extends React.Component {
         loadData={this.loadData} 
         fgRef={this.fgRef} 
         latestNode={this.state.latestNode} 
-    driver={this.driver} // Pass the driver
+        driver={this.driver} // Pass the driver
+        isPolling={this.state.isPolling}
+        lastUpdateTime={this.state.lastUpdateTime}
+        startPolling={this.startPolling}
+        stopPolling={this.stopPolling}
+        customQueryActive={this.state.customQueryActive}
+        resetQuery={this.resetQuery}
     />
   } />
   </Routes>
@@ -237,7 +608,7 @@ const NFCTrigger = ({ addNode }) => {
         return <div style={{ textAlign: "center", padding: "20px", fontSize: "16px", color: "red" }}>Processing NFC tap for {username}...</div>
       };
 
-      const GraphView = ({ data, handleChange, loadData, fgRef, latestNode, driver }) => {
+              const GraphView = ({ data, handleChange, loadData, fgRef, latestNode, driver, isPolling, lastUpdateTime, startPolling, stopPolling, customQueryActive, resetQuery }) => {
         const [inputValue, setInputValue] = useState(""); 
         const [selectedNode, setSelectedNode] = useState(null);
         const [editedNode, setEditedNode] = useState(null);
@@ -646,6 +1017,99 @@ return (
       </form>
       <button id="visualize" onClick={() => window.open("https://awuchen.github.io/craft-network-3d/", "_blank")}>Visualize3D</button>
       <button id="info" onClick={() => window.open("https://www.hako.soooul.xyz/drafts/washi", "_blank")}>Info</button>
+      <button 
+        id="toggle-polling" 
+        onClick={() => isPolling ? stopPolling() : startPolling()}
+        style={{ 
+          backgroundColor: isPolling ? "#f44336" : "#4CAF50",
+          color: "white",
+          border: "none",
+          padding: "8px 16px",
+          borderRadius: "4px",
+          cursor: "pointer"
+        }}
+      >
+        {isPolling ? "Pause Updates" : "Resume Updates"}
+      </button>
+      
+      {/* Custom query indicator and reset button */}
+      {customQueryActive && (
+        <div style={{
+          position: "fixed",
+          top: "60px",
+          right: "10px",
+          padding: "8px 12px",
+          backgroundColor: "#FF9800",
+          color: "white",
+          borderRadius: "4px",
+          fontSize: "12px",
+          zIndex: 1000,
+          display: "flex",
+          alignItems: "center",
+          gap: "8px"
+        }}>
+          <div style={{
+            width: "8px",
+            height: "8px",
+            borderRadius: "50%",
+            backgroundColor: "#fff",
+            animation: "pulse 1s infinite"
+          }}></div>
+          Custom Query Active
+          <button
+            onClick={resetQuery}
+            style={{
+              backgroundColor: "transparent",
+              color: "white",
+              border: "1px solid white",
+              borderRadius: "2px",
+              padding: "2px 6px",
+              fontSize: "10px",
+              cursor: "pointer"
+            }}
+          >
+            Reset
+          </button>
+        </div>
+      )}
+      
+      {/* Real-time update status indicator */}
+      <div style={{ 
+        position: "fixed", 
+        top: "10px", 
+        right: "10px", 
+        padding: "8px 12px", 
+        backgroundColor: isPolling ? "#4CAF50" : "#f44336", 
+        color: "white", 
+        borderRadius: "4px", 
+        fontSize: "12px",
+        zIndex: 1000,
+        display: "flex",
+        alignItems: "center",
+        gap: "8px"
+      }}>
+        <div style={{ 
+          width: "8px", 
+          height: "8px", 
+          borderRadius: "50%", 
+          backgroundColor: isPolling ? "#fff" : "#ccc",
+          animation: isPolling ? "pulse 2s infinite" : "none"
+        }}></div>
+        {isPolling ? "Live Updates Active" : "Updates Paused"}
+        {lastUpdateTime && (
+          <span style={{ fontSize: "10px", opacity: 0.8 }}>
+            (Last: {new Date(lastUpdateTime).toLocaleTimeString()})
+          </span>
+        )}
+      </div>
+      
+      <style>{`
+        @keyframes pulse {
+          0% { opacity: 1; }
+          50% { opacity: 0.5; }
+          100% { opacity: 1; }
+        }
+      `}</style>
 
   <ForceGraph2D
   ref={fgRef}
