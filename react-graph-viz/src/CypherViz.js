@@ -71,6 +71,12 @@ class CypherViz extends React.Component {
 
   // Check if user is idle and should return to default query
   checkIdleAndReturnToDefault = () => {
+    // Don't interfere if a mutation is being processed
+    if (this.state.processingMutation) {
+      console.log("Skipping idle check - mutation in progress");
+      return;
+    }
+    
     if (this.state.customQueryActive && !this.state.isUserActive) {
       console.log("User is idle, returning to default query");
       this.setState({ 
@@ -147,6 +153,14 @@ class CypherViz extends React.Component {
       isCustomQuery = true;
     }
     
+    // Check if this is a mutation query BEFORE determining if it's custom
+    const isMutationQuery = /(CREATE|MERGE|SET|DELETE|REMOVE|DETACH DELETE)/i.test(queryToExecute.trim());
+    
+    // If it's a mutation query, it should never be treated as a custom query
+    if (isMutationQuery) {
+      isCustomQuery = false;
+    }
+    
     // Validate the query
     if (!queryToExecute || typeof queryToExecute !== 'string' || queryToExecute.trim() === '') {
       console.error("Invalid query:", queryToExecute);
@@ -170,8 +184,7 @@ class CypherViz extends React.Component {
       console.log("Query override:", queryOverride);
       console.log("New node name:", newNodeName);
       
-      // Check if this is a mutation query
-      const isMutationQuery = /(CREATE|MERGE|SET|DELETE|REMOVE|DETACH DELETE)/i.test(queryToExecute.trim());
+      // Use the mutation detection from earlier
       console.log("Is mutation query:", isMutationQuery);
       
       res = await session.run(queryToExecute);
@@ -179,11 +192,16 @@ class CypherViz extends React.Component {
       // Handle mutations for ALL queries (not just custom ones)
       if (isMutationQuery) {
         // For mutation queries, immediately return to default query
+        console.log("=== MUTATION DETECTED ===");
         console.log("Mutation query detected, immediately returning to default query");
+        console.log("Query type:", queryToExecute.trim().split(' ')[0]);
+        
+        // Force return to default state regardless of idle detection
         this.setState({ 
           customQueryActive: false, 
           customQueryTimeout: null,
-          processingMutation: true
+          processingMutation: true,
+          isUserActive: true // Temporarily mark as active to prevent idle interference
         });
         
         // Clear any existing timeout
@@ -196,14 +214,20 @@ class CypherViz extends React.Component {
           clearTimeout(this.mutationReloadTimeout);
         }
         
-        // Reload with default query to show updated graph
-        console.log("Setting up mutation reload timeout...");
-        this.mutationReloadTimeout = setTimeout(() => {
-          console.log("Executing mutation reload with default query");
-          this.loadData(null, this.defaultQuery);
-          this.setState({ processingMutation: false });
-          this.mutationReloadTimeout = null;
-        }, 1000); // Small delay to ensure mutation is complete
+        // Immediately reload with default query to show updated graph
+        console.log("Executing mutation reload with default query immediately");
+        this.loadData(null, this.defaultQuery);
+        this.setState({ processingMutation: false });
+        this.mutationReloadTimeout = null;
+        console.log("=== MUTATION COMPLETED ===");
+        
+        // Reset user activity state after a short delay to allow idle detection to work normally
+        setTimeout(() => {
+          this.updateUserActivity();
+        }, 100);
+        
+        // Return early to prevent processing mutation query results
+        return;
       } else if (isCustomQuery) {
         // For non-mutation custom queries, activate custom query state
         console.log("Custom query activated, will return to default when user is idle");
@@ -365,17 +389,17 @@ class CypherViz extends React.Component {
         latestNode: newNodeName,
         lastUpdateTime: hasChanged ? now : this.state.lastUpdateTime
       }, () => {
-        if (newNodeName) {
-          setTimeout(() => {
-            let newNode = nodes.find((n) => n.name === newNodeName);
-            if (newNode && this.fgRef.current) {
-              console.log("Focusing on:", newNode);
-              this.fgRef.current.centerAt(newNode.x, newNode.y, 1500);
-              this.fgRef.current.zoom(1.25);
-            }
-          }, 2000);
-        }
-      });
+      if (newNodeName) {
+        setTimeout(() => {
+          let newNode = nodes.find((n) => n.name === newNodeName);
+          if (newNode && this.fgRef.current) {
+            console.log("Focusing on:", newNode);
+            this.fgRef.current.centerAt(newNode.x, newNode.y, 1500);
+            this.fgRef.current.zoom(1.25);
+          }
+        }, 2000);
+      }
+    });
     } else {
       // Even if no change, we might need to update latestNode for new additions
       if (newNodeName && this.state.latestNode !== newNodeName) {
@@ -693,7 +717,7 @@ class CypherViz extends React.Component {
         loadData={this.loadData} 
         fgRef={this.fgRef} 
         latestNode={this.state.latestNode} 
-        driver={this.driver} // Pass the driver
+    driver={this.driver} // Pass the driver
         isPolling={this.state.isPolling}
         lastUpdateTime={this.state.lastUpdateTime}
         startPolling={this.startPolling}
@@ -1026,8 +1050,10 @@ const NFCTrigger = ({ addNode }) => {
             // Check if the generated query is a mutation query (updates the graph)
             const isMutationQuery = /(CREATE|MERGE|SET|DELETE|REMOVE|DETACH DELETE)/i.test(generatedQuery.trim());
             
-            // If it's a mutation query, reload with the default MATCH query to show the updated graph
+            // If it's a mutation query, immediately return to default state
             if (isMutationQuery) {
+              console.log("Mutation query from Flowise detected, immediately returning to default state");
+              
               // Extract node names from the mutation query to track what was created/modified
               let extractedNodes = [];
               
@@ -1060,6 +1086,7 @@ const NFCTrigger = ({ addNode }) => {
               setMutatedNodes(extractedNodes);
               setLastAction('mutation');
               
+              // Immediately return to default query without any delay
               const defaultQuery = `
                 MATCH (u:User)-[r:CONNECTED_TO]->(v:User)
                 RETURN u.name AS source, u.role AS sourceRole, u.location AS sourceLocation, u.website AS sourceWebsite, 
