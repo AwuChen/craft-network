@@ -667,7 +667,7 @@ class CypherViz extends React.Component {
 
          MERGE (nfc:User {name: $nfcUser}) 
          ON CREATE SET nfc.role = 'Holder', 
-                       nfc.location = $nfcUser + "'s network", 
+                       nfc.location = '', 
                        nfc.website = ''
 
          MERGE (awu:User {name: $awuUser}) 
@@ -824,7 +824,7 @@ const NFCTrigger = ({ addNode }) => {
         addAndRedirect();
         }, [location, username]);
 
-        return <div style={{ textAlign: "center", padding: "20px", fontSize: "16px", color: "red" }}>Processing NFC tap for {username}...</div>
+        return <div style={{ textAlign: "center", padding: "20px", fontSize: "16px", color: "red" }}>Adding you to {username}'s network...</div>
       };
 
               const GraphView = ({ data, handleChange, loadData, fgRef, latestNode, driver, processingMutation, updateUserActivity, isUserActive }) => {
