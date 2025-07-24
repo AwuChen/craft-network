@@ -29,7 +29,7 @@ class CypherViz extends React.Component {
       processingMutation: false,
       lastUserActivity: Date.now(),
       isUserActive: true,
-      debugLogs: []
+
     };
 
     // Store the default query for polling (separate from user input)
@@ -49,24 +49,10 @@ class CypherViz extends React.Component {
     this.idleTimeout = null;
     this.idleCheckInterval = null;
     this.isNFCOperation = false; // Flag to prevent double reload during NFC operations
-    this.debugLogs = []; // Array to store debug logs for display
+
   }
 
-  // Debug logging function
-  debugLog = (message) => {
-    const timestamp = new Date().toLocaleTimeString();
-    const logEntry = `[${timestamp}] ${message}`;
-    console.log(logEntry);
-    
-    // Store in debug logs array (keep last 20 logs)
-    this.debugLogs.push(logEntry);
-    if (this.debugLogs.length > 20) {
-      this.debugLogs.shift();
-    }
-    
-    // Update state to trigger re-render
-    this.setState({ debugLogs: [...this.debugLogs] });
-  };
+
 
   // Update user activity timestamp
   updateUserActivity = () => {
@@ -148,7 +134,6 @@ class CypherViz extends React.Component {
   };
 
   loadData = async (newNodeName = null, queryOverride = null) => {
-    this.debugLog(`loadData called - newNodeName: ${newNodeName}, queryOverride: ${queryOverride ? 'custom' : 'default'}`);
     let session = this.driver.session({ database: "neo4j" });
     let res;
     
@@ -172,24 +157,19 @@ class CypherViz extends React.Component {
     
     // Special handling for NFC operations - if we have a pending NFC node, 
     // we should use the default query to reload the graph after mutation
-    this.debugLog(`NFC check - newNodeName: ${newNodeName}, pendingNFCNode: ${this.pendingNFCNode}, isNFCOperation: ${this.isNFCOperation}`);
     if (newNodeName && this.pendingNFCNode && newNodeName === this.pendingNFCNode) {
-      this.debugLog(`NFC reload detected, using default query`);
       queryToExecute = this.defaultQuery;
       isCustomQuery = false;
     }
     
-    this.debugLog(`Query to execute: ${queryToExecute ? queryToExecute.substring(0, 50) + '...' : 'null'}`);
-    this.debugLog(`isCustomQuery: ${isCustomQuery}, newNodeName: ${newNodeName}`);
+
     
     // Check if this is a mutation query BEFORE determining if it's custom
     const isMutationQuery = /(CREATE|MERGE|SET|DELETE|REMOVE|DETACH DELETE)/i.test(queryToExecute.trim());
-    this.debugLog(`Mutation detection - isMutationQuery: ${isMutationQuery}, query: ${queryToExecute.trim().substring(0, 30)}...`);
     
     // If it's a mutation query, it should never be treated as a custom query
     if (isMutationQuery) {
       isCustomQuery = false;
-      this.debugLog(`Mutation query detected, setting isCustomQuery to false`);
     }
     
     // Validate the query
@@ -208,23 +188,12 @@ class CypherViz extends React.Component {
     }
     
     try {
-      this.debugLog(`Executing query...`);
-      res = await session.run(queryToExecute);
-      this.debugLog(`Query executed successfully`);
-      this.debugLog(`Query returned ${res.records.length} records`);
-      
-      // Debug the first few records to see what's being returned
-      if (res.records.length > 0) {
-        const firstRecord = res.records[0];
-        this.debugLog(`First record keys: ${firstRecord.keys.join(', ')}`);
-        if (firstRecord.has('source')) {
-          this.debugLog(`First record source: ${firstRecord.get('source')}`);
-        }
-      }
+  
+              res = await session.run(queryToExecute);
       
       // Handle mutations for ALL queries (not just custom ones)
       if (isMutationQuery) {
-        this.debugLog(`Mutation detected. NFC operation: ${this.isNFCOperation}, Processing mutation: ${this.state.processingMutation}`);
+              this.debugLog(`Mutation detected`);
         // For mutation queries, immediately return to default query
         
         // Force return to default state regardless of idle detection
@@ -247,10 +216,11 @@ class CypherViz extends React.Component {
         
         // Store the pending NFC node before reloading
         const pendingNode = this.pendingNFCNode;
-        this.debugLog(`Mutation handling - pendingNode: ${pendingNode}, isNFCOperation: ${this.isNFCOperation}`);
         
-        // Only reload if we're not already processing a mutation to prevent double reload
-        if (!this.state.processingMutation && !this.isNFCOperation) {
+        // For NFC operations, don't trigger another reload since addNodeNFC already handles it
+        if (this.isNFCOperation) {
+          this.debugLog(`NFC operation detected, skipping additional reload`);
+        } else if (!this.state.processingMutation) {
           this.debugLog(`Reloading with default query and pending node: ${pendingNode}`);
           // Immediately reload with default query to show updated graph
           this.loadData(pendingNode, this.defaultQuery);
@@ -261,20 +231,17 @@ class CypherViz extends React.Component {
         this.setState({ processingMutation: false });
         this.mutationReloadTimeout = null;
         
-        // If this was an NFC addition, focus on the new node after mutation completes
-        if (pendingNode) {
-                this.debugLog(`Setting up focus for NFC node: ${pendingNode} in 1.5 seconds`);
-      setTimeout(() => {
-        this.debugLog(`Executing focus for NFC node: ${pendingNode}`);
-        this.focusOnNewNode(pendingNode, this.state.data);
-        this.pendingNFCNode = null;
-        this.isNFCOperation = false; // Reset NFC operation flag
-        this.debugLog(`NFC operation completed, flags reset`);
-      }, 1500); // Wait for mutation reload to complete
+        // For NFC operations, focusing is handled in addNodeNFC, so skip here
+        if (pendingNode && !this.isNFCOperation) {
+          setTimeout(() => {
+            this.focusOnNewNode(pendingNode, this.state.data);
+            this.pendingNFCNode = null;
+          }, 1500);
+        } else if (this.isNFCOperation) {
+          this.debugLog(`NFC operation - focusing will be handled by addNodeNFC`);
         } else {
           // Reset NFC operation flag if no pending node
           this.isNFCOperation = false;
-          console.log(`No pending node, reset isNFCOperation flag`);
         }
         
         // Reset user activity state after a short delay to allow idle detection to work normally
@@ -304,6 +271,7 @@ class CypherViz extends React.Component {
     } finally {
       session.close();
     }
+
 
     let nodesMap = new Map();
     let links = [];
@@ -393,8 +361,7 @@ class CypherViz extends React.Component {
     const nodes = Array.from(nodesMap.values());
     const updatedData = { nodes, links };
     
-    this.debugLog(`Parsed ${nodes.length} nodes from query results`);
-    this.debugLog(`Parsed ${links.length} links from query results`);
+    this.debugLog(`Parsed ${nodes.length} nodes and ${links.length} links from query results`);
     
     // Check if our NFC node is in the parsed results
     if (this.pendingNFCNode) {
@@ -422,19 +389,27 @@ class CypherViz extends React.Component {
     const now = Date.now();
     const timeSinceLastUpdate = now - this.lastUpdateTime;
     
-    if ((hasChanged || hasDetailedChange || this.lastDataHash === null) && 
+    this.debugLog(`Change detection - hasChanged: ${hasChanged}, hasDetailedChange: ${hasDetailedChange}, isDataIdentical: ${isDataIdentical}, timeSinceLastUpdate: ${timeSinceLastUpdate}, updateCount: ${this.updateCount}`);
+    
+    // Force update if we have a newNodeName (NFC operation) regardless of debounce
+    const forceUpdateForNFC = newNodeName && this.pendingNFCNode && newNodeName === this.pendingNFCNode;
+    this.debugLog(`Force update for NFC: ${forceUpdateForNFC} - newNodeName: ${newNodeName}, pendingNFCNode: ${this.pendingNFCNode}`);
+    
+    if ((hasChanged || hasDetailedChange || this.lastDataHash === null || forceUpdateForNFC) && 
         !isDataIdentical &&
-        (timeSinceLastUpdate > this.updateDebounceTime || this.lastDataHash === null) &&
+        (timeSinceLastUpdate > this.updateDebounceTime || this.lastDataHash === null || forceUpdateForNFC) &&
         this.updateCount < this.maxUpdatesPerCycle) {
       // Update the hash only when we actually update the state
       this.lastDataHash = currentDataHash;
       this.lastUpdateTime = now;
       this.updateCount++;
       
-      this.debugLog(`Updating state with latestNode: ${newNodeName}`);
+      // Preserve latestNode if newNodeName is null but we have a valid latestNode
+      const nodeToSet = newNodeName || this.state.latestNode;
+      this.debugLog(`Updating state with latestNode: ${nodeToSet}`);
       this.setState({ 
         data: updatedData, 
-        latestNode: newNodeName,
+        latestNode: nodeToSet,
         lastUpdateTime: hasChanged ? now : this.state.lastUpdateTime
       }, () => {
       if (newNodeName) {
@@ -444,6 +419,7 @@ class CypherViz extends React.Component {
       }
     });
     } else {
+      this.debugLog(`State update skipped due to change detection`);
       // Even if no change, we might need to update latestNode for new additions
       if (newNodeName && this.state.latestNode !== newNodeName) {
         this.setState({ latestNode: newNodeName });
@@ -456,8 +432,6 @@ class CypherViz extends React.Component {
   // Focus on a newly added node with multiple attempts
   focusOnNewNode = (nodeName, graphData) => {
     this.debugLog(`Attempting to focus on NFC node: ${nodeName}`);
-    this.debugLog(`Graph data has ${graphData.nodes.length} nodes`);
-    this.debugLog(`Available nodes: ${graphData.nodes.map(n => n.name).join(', ')}`);
     
     const attemptFocus = (attempt = 1) => {
       if (attempt > 5) {
@@ -480,8 +454,8 @@ class CypherViz extends React.Component {
 
       try {
         this.debugLog(`Focusing on node: ${nodeName} at (${newNode.x}, ${newNode.y})`);
-        this.fgRef.current.centerAt(newNode.x, newNode.y, 1500);
-        this.fgRef.current.zoom(1.25);
+            this.fgRef.current.centerAt(newNode.x, newNode.y, 1500);
+            this.fgRef.current.zoom(1.25);
         
         // Also ensure the latestNode state is set
         this.setState({ latestNode: nodeName });
@@ -558,11 +532,13 @@ class CypherViz extends React.Component {
     this.pollingInterval = setInterval(() => {
       // Only poll if the tab is active (to save resources)
       if (!document.hidden) {
-        // Use default query for polling, but respect custom query state and mutation processing
-        if (this.state.customQueryActive || this.state.processingMutation) {
+                // Use default query for polling, but respect custom query state, mutation processing, and NFC operations
+        if (this.state.customQueryActive || this.state.processingMutation || this.isNFCOperation) {
           return;
         }
-        this.loadData(null, this.defaultQuery);
+        // Preserve the latestNode when polling (don't pass null)
+        const preserveLatestNode = this.state.latestNode;
+        this.loadData(preserveLatestNode, this.defaultQuery);
       }
     }, 5000); // Check every 5 seconds
     
@@ -699,7 +675,7 @@ class CypherViz extends React.Component {
 
     // Set NFC operation flag to prevent double reload
     this.isNFCOperation = true;
-    this.debugLog(`Set isNFCOperation to true`);
+    this.debugLog(`Set isNFCOperation to true for NFC operation`);
 
     // Clear any existing pending NFC node to prevent conflicts
     if (this.pendingNFCNode) {
@@ -743,18 +719,22 @@ class CypherViz extends React.Component {
       
       // Wait for the state to be updated, then focus
       this.debugLog(`Waiting for state update before focusing...`);
+      let checkCount = 0;
       const waitForStateUpdate = () => {
         const nodeExists = this.state.data.nodes.find(n => n.name === capitalizedNewUser);
-        this.debugLog(`Checking if node exists in state: ${nodeExists ? 'YES' : 'NO'}`);
+        checkCount++;
         
         if (nodeExists) {
           this.debugLog(`Node found in state, focusing now`);
           this.focusOnNewNode(capitalizedNewUser, this.state.data);
           this.pendingNFCNode = null;
           this.isNFCOperation = false;
-          this.debugLog(`NFC operation completed, flags reset`);
+          this.debugLog(`NFC operation completed, flags reset - polling will resume`);
         } else {
-          this.debugLog(`Node not in state yet, retrying in 500ms`);
+          // Only log every 10th check (every 5 seconds since checks are every 500ms)
+          if (checkCount % 10 === 0) {
+            this.debugLog(`Node not in state yet, retrying in 500ms (attempt ${checkCount})`);
+          }
           setTimeout(waitForStateUpdate, 500);
         }
       };
@@ -825,7 +805,7 @@ class CypherViz extends React.Component {
     }
   };
 
-    render() {
+  render() {
     return (
       <Router>
       <div>
