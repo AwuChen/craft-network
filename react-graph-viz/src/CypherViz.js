@@ -28,7 +28,8 @@ class CypherViz extends React.Component {
       customQueryTimeout: null,
       processingMutation: false,
       lastUserActivity: Date.now(),
-      isUserActive: true
+      isUserActive: true,
+      debugLogs: []
     };
 
     // Store the default query for polling (separate from user input)
@@ -47,7 +48,25 @@ class CypherViz extends React.Component {
     this.mutationReloadTimeout = null;
     this.idleTimeout = null;
     this.idleCheckInterval = null;
+    this.isNFCOperation = false; // Flag to prevent double reload during NFC operations
+    this.debugLogs = []; // Array to store debug logs for display
   }
+
+  // Debug logging function
+  debugLog = (message) => {
+    const timestamp = new Date().toLocaleTimeString();
+    const logEntry = `[${timestamp}] ${message}`;
+    console.log(logEntry);
+    
+    // Store in debug logs array (keep last 20 logs)
+    this.debugLogs.push(logEntry);
+    if (this.debugLogs.length > 20) {
+      this.debugLogs.shift();
+    }
+    
+    // Update state to trigger re-render
+    this.setState({ debugLogs: [...this.debugLogs] });
+  };
 
   // Update user activity timestamp
   updateUserActivity = () => {
@@ -129,6 +148,7 @@ class CypherViz extends React.Component {
   };
 
   loadData = async (newNodeName = null, queryOverride = null) => {
+    this.debugLog(`loadData called - newNodeName: ${newNodeName}, queryOverride: ${queryOverride ? 'custom' : 'default'}`);
     let session = this.driver.session({ database: "neo4j" });
     let res;
     
@@ -150,12 +170,26 @@ class CypherViz extends React.Component {
       isCustomQuery = true;
     }
     
+    // Special handling for NFC operations - if we have a pending NFC node, 
+    // we should use the default query to reload the graph after mutation
+    this.debugLog(`NFC check - newNodeName: ${newNodeName}, pendingNFCNode: ${this.pendingNFCNode}, isNFCOperation: ${this.isNFCOperation}`);
+    if (newNodeName && this.pendingNFCNode && newNodeName === this.pendingNFCNode) {
+      this.debugLog(`NFC reload detected, using default query`);
+      queryToExecute = this.defaultQuery;
+      isCustomQuery = false;
+    }
+    
+    this.debugLog(`Query to execute: ${queryToExecute ? queryToExecute.substring(0, 50) + '...' : 'null'}`);
+    this.debugLog(`isCustomQuery: ${isCustomQuery}, newNodeName: ${newNodeName}`);
+    
     // Check if this is a mutation query BEFORE determining if it's custom
     const isMutationQuery = /(CREATE|MERGE|SET|DELETE|REMOVE|DETACH DELETE)/i.test(queryToExecute.trim());
+    this.debugLog(`Mutation detection - isMutationQuery: ${isMutationQuery}, query: ${queryToExecute.trim().substring(0, 30)}...`);
     
     // If it's a mutation query, it should never be treated as a custom query
     if (isMutationQuery) {
       isCustomQuery = false;
+      this.debugLog(`Mutation query detected, setting isCustomQuery to false`);
     }
     
     // Validate the query
@@ -170,15 +204,27 @@ class CypherViz extends React.Component {
     const isValidQuery = validStartKeywords.some(keyword => queryStart.startsWith(keyword));
     
     if (!isValidQuery) {
-      console.error("Invalid Cypher query format:", queryToExecute);
       return;
     }
     
     try {
+      this.debugLog(`Executing query...`);
       res = await session.run(queryToExecute);
+      this.debugLog(`Query executed successfully`);
+      this.debugLog(`Query returned ${res.records.length} records`);
+      
+      // Debug the first few records to see what's being returned
+      if (res.records.length > 0) {
+        const firstRecord = res.records[0];
+        this.debugLog(`First record keys: ${firstRecord.keys.join(', ')}`);
+        if (firstRecord.has('source')) {
+          this.debugLog(`First record source: ${firstRecord.get('source')}`);
+        }
+      }
       
       // Handle mutations for ALL queries (not just custom ones)
       if (isMutationQuery) {
+        this.debugLog(`Mutation detected. NFC operation: ${this.isNFCOperation}, Processing mutation: ${this.state.processingMutation}`);
         // For mutation queries, immediately return to default query
         
         // Force return to default state regardless of idle detection
@@ -199,10 +245,37 @@ class CypherViz extends React.Component {
           clearTimeout(this.mutationReloadTimeout);
         }
         
-        // Immediately reload with default query to show updated graph
-        this.loadData(null, this.defaultQuery);
+        // Store the pending NFC node before reloading
+        const pendingNode = this.pendingNFCNode;
+        this.debugLog(`Mutation handling - pendingNode: ${pendingNode}, isNFCOperation: ${this.isNFCOperation}`);
+        
+        // Only reload if we're not already processing a mutation to prevent double reload
+        if (!this.state.processingMutation && !this.isNFCOperation) {
+          this.debugLog(`Reloading with default query and pending node: ${pendingNode}`);
+          // Immediately reload with default query to show updated graph
+          this.loadData(pendingNode, this.defaultQuery);
+        } else {
+          this.debugLog(`Skipping reload - processingMutation: ${this.state.processingMutation}, isNFCOperation: ${this.isNFCOperation}`);
+        }
+        
         this.setState({ processingMutation: false });
         this.mutationReloadTimeout = null;
+        
+        // If this was an NFC addition, focus on the new node after mutation completes
+        if (pendingNode) {
+                this.debugLog(`Setting up focus for NFC node: ${pendingNode} in 1.5 seconds`);
+      setTimeout(() => {
+        this.debugLog(`Executing focus for NFC node: ${pendingNode}`);
+        this.focusOnNewNode(pendingNode, this.state.data);
+        this.pendingNFCNode = null;
+        this.isNFCOperation = false; // Reset NFC operation flag
+        this.debugLog(`NFC operation completed, flags reset`);
+      }, 1500); // Wait for mutation reload to complete
+        } else {
+          // Reset NFC operation flag if no pending node
+          this.isNFCOperation = false;
+          console.log(`No pending node, reset isNFCOperation flag`);
+        }
         
         // Reset user activity state after a short delay to allow idle detection to work normally
         setTimeout(() => {
@@ -319,6 +392,15 @@ class CypherViz extends React.Component {
 
     const nodes = Array.from(nodesMap.values());
     const updatedData = { nodes, links };
+    
+    this.debugLog(`Parsed ${nodes.length} nodes from query results`);
+    this.debugLog(`Parsed ${links.length} links from query results`);
+    
+    // Check if our NFC node is in the parsed results
+    if (this.pendingNFCNode) {
+      const nfcNodeInResults = nodes.find(n => n.name === this.pendingNFCNode);
+      this.debugLog(`NFC node ${this.pendingNFCNode} in parsed results: ${nfcNodeInResults ? 'YES' : 'NO'}`);
+    }
 
     // Calculate hash of current data for change detection
     const currentDataHash = this.calculateDataHash(updatedData);
@@ -330,19 +412,7 @@ class CypherViz extends React.Component {
     // Additional check: if the data is exactly the same, don't update
     const isDataIdentical = JSON.stringify(updatedData) === JSON.stringify(this.state.data);
     
-    // Store a reference to the current state data for next comparison
-    const currentStateData = this.state.data;
-    
-    console.log("=== Change Detection Debug ===");
-    console.log("Current hash:", currentDataHash);
-    console.log("Last hash:", this.lastDataHash);
-    console.log("Hash changed:", hasChanged);
-    console.log("Detailed change detected:", hasDetailedChange);
-    console.log("Data identical:", isDataIdentical);
-    console.log("Current nodes count:", updatedData.nodes.length);
-    console.log("Current links count:", updatedData.links.length);
-    console.log("State nodes count:", this.state.data.nodes.length);
-    console.log("State links count:", this.state.data.links.length);
+
     
 
 
@@ -361,19 +431,16 @@ class CypherViz extends React.Component {
       this.lastUpdateTime = now;
       this.updateCount++;
       
+      this.debugLog(`Updating state with latestNode: ${newNodeName}`);
       this.setState({ 
         data: updatedData, 
         latestNode: newNodeName,
         lastUpdateTime: hasChanged ? now : this.state.lastUpdateTime
       }, () => {
       if (newNodeName) {
-        setTimeout(() => {
-          let newNode = nodes.find((n) => n.name === newNodeName);
-          if (newNode && this.fgRef.current) {
-            this.fgRef.current.centerAt(newNode.x, newNode.y, 1500);
-            this.fgRef.current.zoom(1.25);
-          }
-        }, 2000);
+        this.debugLog(`State updated, focusing on newNode: ${newNodeName}`);
+        // Focus on the new node with multiple attempts to ensure it works
+        this.focusOnNewNode(newNodeName, updatedData);
       }
     });
     } else {
@@ -384,6 +451,49 @@ class CypherViz extends React.Component {
       // Reset update count when no changes are detected
       this.updateCount = 0;
     }
+  };
+
+  // Focus on a newly added node with multiple attempts
+  focusOnNewNode = (nodeName, graphData) => {
+    this.debugLog(`Attempting to focus on NFC node: ${nodeName}`);
+    this.debugLog(`Graph data has ${graphData.nodes.length} nodes`);
+    this.debugLog(`Available nodes: ${graphData.nodes.map(n => n.name).join(', ')}`);
+    
+    const attemptFocus = (attempt = 1) => {
+      if (attempt > 5) {
+        this.debugLog(`Failed to focus on node after 5 attempts: ${nodeName}`);
+        return;
+      }
+
+      const newNode = graphData.nodes.find((n) => n.name === nodeName);
+      if (!newNode) {
+        this.debugLog(`Node ${nodeName} not found in graph data, attempt ${attempt}`);
+        setTimeout(() => attemptFocus(attempt + 1), 500);
+        return;
+      }
+
+      if (!this.fgRef.current) {
+        this.debugLog(`Graph reference not ready, attempt ${attempt}`);
+        setTimeout(() => attemptFocus(attempt + 1), 500);
+        return;
+      }
+
+      try {
+        this.debugLog(`Focusing on node: ${nodeName} at (${newNode.x}, ${newNode.y})`);
+        this.fgRef.current.centerAt(newNode.x, newNode.y, 1500);
+        this.fgRef.current.zoom(1.25);
+        
+        // Also ensure the latestNode state is set
+        this.setState({ latestNode: nodeName });
+        this.debugLog(`Successfully focused on node: ${nodeName}`);
+      } catch (error) {
+        this.debugLog(`Focus attempt failed, retrying: ${error.message}`);
+        setTimeout(() => attemptFocus(attempt + 1), 500);
+      }
+    };
+
+    // Start with a longer delay for the first attempt to ensure graph is rendered
+    setTimeout(() => attemptFocus(1), 1000);
   };
 
   // Calculate a simple hash of the graph data for change detection
@@ -478,10 +588,12 @@ class CypherViz extends React.Component {
     this.setState({ isPolling: false });
   };
 
-  // WebSocket methods for real-time updates
+  // WebSocket methods for real-time updates (disabled for now)
   connectWebSocket = () => {
+    // WebSocket is disabled - using polling instead
+    // Uncomment and configure when WebSocket server is available
+    /*
     try {
-      // Replace with your WebSocket server URL
       this.websocket = new WebSocket('wss://your-websocket-server.com');
       
       this.websocket.onopen = () => {
@@ -491,13 +603,12 @@ class CypherViz extends React.Component {
       this.websocket.onmessage = (event) => {
         const message = JSON.parse(event.data);
         if (message.type === 'graph_update') {
-          this.loadData(null, this.defaultQuery); // Reload data when update is received
+          this.loadData(null, this.defaultQuery);
         }
       };
       
       this.websocket.onclose = () => {
         this.setState({ wsConnected: false });
-        // Fallback to polling if WebSocket fails
         setTimeout(() => {
           if (!this.state.isPolling) {
             this.startPolling();
@@ -506,14 +617,15 @@ class CypherViz extends React.Component {
       };
       
       this.websocket.onerror = (error) => {
-        console.error('WebSocket error:', error);
         this.setState({ wsConnected: false });
       };
     } catch (error) {
-      console.error('Failed to connect WebSocket:', error);
-      // Fallback to polling
       this.startPolling();
     }
+    */
+    
+    // Start polling directly since WebSocket is disabled
+    this.startPolling();
   };
 
   disconnectWebSocket = () => {
@@ -524,14 +636,14 @@ class CypherViz extends React.Component {
     this.setState({ wsConnected: false, useWebSocket: false });
   };
 
-  // Enhanced componentDidMount to try WebSocket first, then fallback to polling
+  // Enhanced componentDidMount to start polling directly
   componentDidMount() {
     // Validate and clean the query state first
     this.validateAndCleanQuery();
     
     this.loadData();
     
-    // Try WebSocket first, fallback to polling
+    // Start polling (WebSocket is disabled)
     this.connectWebSocket();
     
     // Add visibility change listener to pause polling when tab is not active
@@ -580,6 +692,21 @@ class CypherViz extends React.Component {
       return str.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
     };
 
+    const capitalizedNewUser = capitalizeWords(newUser);
+    this.debugLog(`=== NFC OPERATION START ===`);
+    this.debugLog(`Adding NFC node: ${capitalizedNewUser} for user: ${capitalizeWords(nfcUserName)}`);
+    this.debugLog(`Current state - isNFCOperation: ${this.isNFCOperation}, processingMutation: ${this.state.processingMutation}`);
+
+    // Set NFC operation flag to prevent double reload
+    this.isNFCOperation = true;
+    this.debugLog(`Set isNFCOperation to true`);
+
+    // Clear any existing pending NFC node to prevent conflicts
+    if (this.pendingNFCNode) {
+      this.debugLog(`Clearing existing pending NFC node: ${this.pendingNFCNode}`);
+      this.pendingNFCNode = null;
+    }
+
     let session = this.driver.session({ database: "neo4j" });
     try {
       await session.run(
@@ -598,12 +725,44 @@ class CypherViz extends React.Component {
          MERGE (u)-[:CONNECTED_TO]->(nfc) 
         MERGE (nfc)-[:CONNECTED_TO]->(awu)`,
         { 
-          user: capitalizeWords(newUser), 
+          user: capitalizedNewUser, 
           nfcUser: capitalizeWords(nfcUserName), 
           awuUser: "Awu Chen" 
         }
         );
-      await this.loadData(newUser);
+      
+      this.debugLog(`NFC mutation completed, storing pending node: ${capitalizedNewUser}`);
+      
+      // Store the new user name for focusing after mutation completes
+      this.pendingNFCNode = capitalizedNewUser;
+      
+      this.debugLog(`About to call loadData with pending node: ${capitalizedNewUser}`);
+      // Trigger a single loadData call to reload the graph with the new node
+      await this.loadData(capitalizedNewUser, this.defaultQuery);
+      this.debugLog(`loadData call completed`);
+      
+      // Wait for the state to be updated, then focus
+      this.debugLog(`Waiting for state update before focusing...`);
+      const waitForStateUpdate = () => {
+        const nodeExists = this.state.data.nodes.find(n => n.name === capitalizedNewUser);
+        this.debugLog(`Checking if node exists in state: ${nodeExists ? 'YES' : 'NO'}`);
+        
+        if (nodeExists) {
+          this.debugLog(`Node found in state, focusing now`);
+          this.focusOnNewNode(capitalizedNewUser, this.state.data);
+          this.pendingNFCNode = null;
+          this.isNFCOperation = false;
+          this.debugLog(`NFC operation completed, flags reset`);
+        } else {
+          this.debugLog(`Node not in state yet, retrying in 500ms`);
+          setTimeout(waitForStateUpdate, 500);
+        }
+      };
+      
+      // Start checking for state update after a short delay
+      setTimeout(waitForStateUpdate, 1000);
+      
+      // Old focusing logic removed - replaced with state-aware focusing above
     } catch (error) {
       console.error("Error adding user:", error);
     } finally {
@@ -628,9 +787,6 @@ class CypherViz extends React.Component {
     
     if (isValidQuery) {
       this.setState({ query: newQuery });
-    } else {
-      // If invalid, don't update the query state
-      console.log("Invalid Cypher query format, not updating state:", newQuery);
     }
   };
 
@@ -655,7 +811,6 @@ class CypherViz extends React.Component {
     
     // Check if current query is valid
     if (!currentQuery || typeof currentQuery !== 'string' || currentQuery.trim() === '') {
-      console.log("Resetting invalid query to default");
       this.setState({ query: this.defaultQuery });
       return;
     }
@@ -666,31 +821,55 @@ class CypherViz extends React.Component {
     const isValidQuery = validStartKeywords.some(keyword => queryStart.startsWith(keyword));
     
     if (!isValidQuery) {
-      console.log("Resetting invalid query to default:", currentQuery);
       this.setState({ query: this.defaultQuery });
     }
   };
 
-  render() {
+    render() {
     return (
       <Router>
       <div>
       <Routes>
       <Route path="/:username" element={<NFCTrigger addNode={this.addNodeNFC} />} />
       <Route path="/" element={
-                <GraphView 
+        <GraphView 
         data={this.state.data} 
         handleChange={this.handleChange} 
         loadData={this.loadData} 
         fgRef={this.fgRef} 
         latestNode={this.state.latestNode} 
-        driver={this.driver} // Pass the driver
+    driver={this.driver} // Pass the driver
         processingMutation={this.state.processingMutation}
         updateUserActivity={this.updateUserActivity}
         isUserActive={this.state.isUserActive}
     />
   } />
   </Routes>
+  
+      {/* Debug Panel */}
+      {this.state.debugLogs.length > 0 && (
+        <div style={{
+          position: "fixed",
+          bottom: "10px",
+          left: "10px",
+          right: "10px",
+          maxHeight: "200px",
+          backgroundColor: "rgba(0,0,0,0.8)",
+          color: "white",
+          padding: "10px",
+          borderRadius: "5px",
+          fontSize: "12px",
+          overflowY: "auto",
+          zIndex: 1000
+        }}>
+          <div style={{ fontWeight: "bold", marginBottom: "5px" }}>Debug Logs:</div>
+          {this.state.debugLogs.map((log, index) => (
+            <div key={index} style={{ marginBottom: "2px", wordBreak: "break-all" }}>
+              {log}
+            </div>
+          ))}
+        </div>
+      )}
   </div>
   </Router>
   );
@@ -704,19 +883,24 @@ const NFCTrigger = ({ addNode }) => {
   React.useEffect(() => {
     const addAndRedirect = async () => {
       const newUser = `User-${Date.now()}`;
+      console.log(`NFC Trigger: Starting NFC operation for ${username} with new user ${newUser}`);
 
       try {
+        console.log(`NFC Trigger: Calling addNode...`);
         await addNode(newUser, username); // pass dynamic user
+        console.log(`NFC Trigger: addNode completed successfully`);
         } catch (error) {
-          console.error("Error adding user:", error);
+          console.error("NFC Trigger: Error adding user:", error);
           return;
         }
 
+        console.log(`NFC Trigger: Redirecting in 2 seconds...`);
         setTimeout(() => {
           window.location.assign("/craft-network/#/");
           }, 2000);
         };
 
+        console.log(`NFC Trigger: Starting addAndRedirect...`);
         addAndRedirect();
         }, [location, username]);
 
@@ -1202,7 +1386,6 @@ return (
       (node.name.toLowerCase().includes(inputValue.toLowerCase()) ||
         (node.location && node.location.toLowerCase().includes(inputValue.toLowerCase())) ||
         (node.role && node.role.toLowerCase().includes(inputValue.toLowerCase())));
-    const isOneDegree = oneDegreeNodes.has(node.name);
     const isNDegree = visibilityNodes.has(node.name);
 
     ctx.globalAlpha = isNDegree ? 1.0 : 0.2;
