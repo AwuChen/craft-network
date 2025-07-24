@@ -191,9 +191,8 @@ class CypherViz extends React.Component {
   
               res = await session.run(queryToExecute);
       
-      // Handle mutations for ALL queries (not just custom ones)
-      if (isMutationQuery) {
-              this.debugLog(`Mutation detected`);
+              // Handle mutations for ALL queries (not just custom ones)
+        if (isMutationQuery) {
         // For mutation queries, immediately return to default query
         
         // Force return to default state regardless of idle detection
@@ -219,13 +218,10 @@ class CypherViz extends React.Component {
         
         // For NFC operations, don't trigger another reload since addNodeNFC already handles it
         if (this.isNFCOperation) {
-          this.debugLog(`NFC operation detected, skipping additional reload`);
+          // Skip additional reload for NFC operations
         } else if (!this.state.processingMutation) {
-          this.debugLog(`Reloading with default query and pending node: ${pendingNode}`);
           // Immediately reload with default query to show updated graph
           this.loadData(pendingNode, this.defaultQuery);
-        } else {
-          this.debugLog(`Skipping reload - processingMutation: ${this.state.processingMutation}, isNFCOperation: ${this.isNFCOperation}`);
         }
         
         this.setState({ processingMutation: false });
@@ -238,7 +234,7 @@ class CypherViz extends React.Component {
             this.pendingNFCNode = null;
           }, 1500);
         } else if (this.isNFCOperation) {
-          this.debugLog(`NFC operation - focusing will be handled by addNodeNFC`);
+          // NFC operation - focusing will be handled by addNodeNFC
         } else {
           // Reset NFC operation flag if no pending node
           this.isNFCOperation = false;
@@ -361,12 +357,9 @@ class CypherViz extends React.Component {
     const nodes = Array.from(nodesMap.values());
     const updatedData = { nodes, links };
     
-    this.debugLog(`Parsed ${nodes.length} nodes and ${links.length} links from query results`);
-    
     // Check if our NFC node is in the parsed results
     if (this.pendingNFCNode) {
       const nfcNodeInResults = nodes.find(n => n.name === this.pendingNFCNode);
-      this.debugLog(`NFC node ${this.pendingNFCNode} in parsed results: ${nfcNodeInResults ? 'YES' : 'NO'}`);
     }
 
     // Calculate hash of current data for change detection
@@ -389,11 +382,8 @@ class CypherViz extends React.Component {
     const now = Date.now();
     const timeSinceLastUpdate = now - this.lastUpdateTime;
     
-    this.debugLog(`Change detection - hasChanged: ${hasChanged}, hasDetailedChange: ${hasDetailedChange}, isDataIdentical: ${isDataIdentical}, timeSinceLastUpdate: ${timeSinceLastUpdate}, updateCount: ${this.updateCount}`);
-    
     // Force update if we have a newNodeName (NFC operation) regardless of debounce
     const forceUpdateForNFC = newNodeName && this.pendingNFCNode && newNodeName === this.pendingNFCNode;
-    this.debugLog(`Force update for NFC: ${forceUpdateForNFC} - newNodeName: ${newNodeName}, pendingNFCNode: ${this.pendingNFCNode}`);
     
     if ((hasChanged || hasDetailedChange || this.lastDataHash === null || forceUpdateForNFC) && 
         !isDataIdentical &&
@@ -406,20 +396,17 @@ class CypherViz extends React.Component {
       
       // Preserve latestNode if newNodeName is null but we have a valid latestNode
       const nodeToSet = newNodeName || this.state.latestNode;
-      this.debugLog(`Updating state with latestNode: ${nodeToSet}`);
       this.setState({ 
         data: updatedData, 
         latestNode: nodeToSet,
         lastUpdateTime: hasChanged ? now : this.state.lastUpdateTime
       }, () => {
       if (newNodeName) {
-        this.debugLog(`State updated, focusing on newNode: ${newNodeName}`);
         // Focus on the new node with multiple attempts to ensure it works
         this.focusOnNewNode(newNodeName, updatedData);
       }
     });
     } else {
-      this.debugLog(`State update skipped due to change detection`);
       // Even if no change, we might need to update latestNode for new additions
       if (newNodeName && this.state.latestNode !== newNodeName) {
         this.setState({ latestNode: newNodeName });
@@ -431,37 +418,29 @@ class CypherViz extends React.Component {
 
   // Focus on a newly added node with multiple attempts
   focusOnNewNode = (nodeName, graphData) => {
-    this.debugLog(`Attempting to focus on NFC node: ${nodeName}`);
-    
     const attemptFocus = (attempt = 1) => {
       if (attempt > 5) {
-        this.debugLog(`Failed to focus on node after 5 attempts: ${nodeName}`);
         return;
       }
 
       const newNode = graphData.nodes.find((n) => n.name === nodeName);
       if (!newNode) {
-        this.debugLog(`Node ${nodeName} not found in graph data, attempt ${attempt}`);
         setTimeout(() => attemptFocus(attempt + 1), 500);
         return;
       }
 
       if (!this.fgRef.current) {
-        this.debugLog(`Graph reference not ready, attempt ${attempt}`);
         setTimeout(() => attemptFocus(attempt + 1), 500);
         return;
       }
 
       try {
-        this.debugLog(`Focusing on node: ${nodeName} at (${newNode.x}, ${newNode.y})`);
-            this.fgRef.current.centerAt(newNode.x, newNode.y, 1500);
-            this.fgRef.current.zoom(1.25);
+        this.fgRef.current.centerAt(newNode.x, newNode.y, 1500);
+        this.fgRef.current.zoom(1.25);
         
         // Also ensure the latestNode state is set
         this.setState({ latestNode: nodeName });
-        this.debugLog(`Successfully focused on node: ${nodeName}`);
       } catch (error) {
-        this.debugLog(`Focus attempt failed, retrying: ${error.message}`);
         setTimeout(() => attemptFocus(attempt + 1), 500);
       }
     };
@@ -669,17 +648,12 @@ class CypherViz extends React.Component {
     };
 
     const capitalizedNewUser = capitalizeWords(newUser);
-    this.debugLog(`=== NFC OPERATION START ===`);
-    this.debugLog(`Adding NFC node: ${capitalizedNewUser} for user: ${capitalizeWords(nfcUserName)}`);
-    this.debugLog(`Current state - isNFCOperation: ${this.isNFCOperation}, processingMutation: ${this.state.processingMutation}`);
 
     // Set NFC operation flag to prevent double reload
     this.isNFCOperation = true;
-    this.debugLog(`Set isNFCOperation to true for NFC operation`);
 
     // Clear any existing pending NFC node to prevent conflicts
     if (this.pendingNFCNode) {
-      this.debugLog(`Clearing existing pending NFC node: ${this.pendingNFCNode}`);
       this.pendingNFCNode = null;
     }
 
@@ -707,34 +681,23 @@ class CypherViz extends React.Component {
         }
         );
       
-      this.debugLog(`NFC mutation completed, storing pending node: ${capitalizedNewUser}`);
-      
       // Store the new user name for focusing after mutation completes
       this.pendingNFCNode = capitalizedNewUser;
       
-      this.debugLog(`About to call loadData with pending node: ${capitalizedNewUser}`);
       // Trigger a single loadData call to reload the graph with the new node
       await this.loadData(capitalizedNewUser, this.defaultQuery);
-      this.debugLog(`loadData call completed`);
       
       // Wait for the state to be updated, then focus
-      this.debugLog(`Waiting for state update before focusing...`);
       let checkCount = 0;
       const waitForStateUpdate = () => {
         const nodeExists = this.state.data.nodes.find(n => n.name === capitalizedNewUser);
         checkCount++;
         
         if (nodeExists) {
-          this.debugLog(`Node found in state, focusing now`);
           this.focusOnNewNode(capitalizedNewUser, this.state.data);
           this.pendingNFCNode = null;
           this.isNFCOperation = false;
-          this.debugLog(`NFC operation completed, flags reset - polling will resume`);
         } else {
-          // Only log every 10th check (every 5 seconds since checks are every 500ms)
-          if (checkCount % 10 === 0) {
-            this.debugLog(`Node not in state yet, retrying in 500ms (attempt ${checkCount})`);
-          }
           setTimeout(waitForStateUpdate, 500);
         }
       };
@@ -826,30 +789,7 @@ class CypherViz extends React.Component {
   } />
   </Routes>
   
-      {/* Debug Panel */}
-      {this.state.debugLogs.length > 0 && (
-        <div style={{
-          position: "fixed",
-          bottom: "10px",
-          left: "10px",
-          right: "10px",
-          maxHeight: "200px",
-          backgroundColor: "rgba(0,0,0,0.8)",
-          color: "white",
-          padding: "10px",
-          borderRadius: "5px",
-          fontSize: "12px",
-          overflowY: "auto",
-          zIndex: 1000
-        }}>
-          <div style={{ fontWeight: "bold", marginBottom: "5px" }}>Debug Logs:</div>
-          {this.state.debugLogs.map((log, index) => (
-            <div key={index} style={{ marginBottom: "2px", wordBreak: "break-all" }}>
-              {log}
-            </div>
-          ))}
-        </div>
-      )}
+
   </div>
   </Router>
   );
