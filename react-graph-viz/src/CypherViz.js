@@ -19,7 +19,8 @@ class CypherViz extends React.Component {
       query: `MATCH (u:User)-[r:CONNECTED_TO]->(v:User) 
           RETURN u.name AS source, u.role AS sourceRole, u.location AS sourceLocation, u.website AS sourceWebsite, 
       v.name AS target, v.role AS targetRole, v.location AS targetLocation, v.website AS targetWebsite`,
-      latestNode: null,
+      latestNode: null, // For NFC editing
+      pollingFocusNode: null, // For polling focus (non-editable)
       lastUpdateTime: null,
       isPolling: false,
       useWebSocket: false,
@@ -51,6 +52,7 @@ class CypherViz extends React.Component {
     this.isNFCOperation = false; // Flag to prevent double reload during NFC operations
     this.changedNodesFromPolling = []; // Track nodes changed during polling
     this.isInitialLoad = true; // Flag to prevent focusing on initial load
+    this.pollingFocusTimeout = null; // Timeout to clear polling focus
 
   }
 
@@ -411,14 +413,25 @@ class CypherViz extends React.Component {
         lastUpdateTime: hasChanged ? now : this.state.lastUpdateTime
       }, () => {
       if (newNodeName) {
-        // Focus on the new node with multiple attempts to ensure it works
+        // Focus on the new node with multiple attempts to ensure it works (NFC editing)
         this.focusOnNewNode(newNodeName, updatedData);
       } else if (this.changedNodesFromPolling.length > 0 && !this.isInitialLoad) {
-        // Focus on the first changed node from polling (but not on initial load)
+        // Focus on the first changed node from polling (but not on initial load) - non-editable
         console.log(`Changed nodes array before focusing: ${this.changedNodesFromPolling.join(', ')}`);
         const firstChangedNode = this.changedNodesFromPolling[0];
         console.log(`Focusing on changed node from polling: ${firstChangedNode}`);
-        this.focusOnNewNode(firstChangedNode, updatedData);
+        this.focusOnPollingNode(firstChangedNode, updatedData);
+        
+        // Set a 10-second timeout to clear the focus
+        if (this.pollingFocusTimeout) {
+          clearTimeout(this.pollingFocusTimeout);
+        }
+        this.pollingFocusTimeout = setTimeout(() => {
+          console.log(`Clearing polling focus after 10 seconds`);
+          this.setState({ pollingFocusNode: null });
+          this.pollingFocusTimeout = null;
+        }, 10000); // 10 seconds
+        
         // Clear the changed nodes list after focusing
         this.changedNodesFromPolling = [];
         console.log(`Changed nodes array cleared after focusing`);
@@ -468,6 +481,48 @@ class CypherViz extends React.Component {
         console.log(`Successfully focused on node: ${nodeName}`);
       } catch (error) {
         console.log(`Focus attempt failed, retrying: ${error.message}`);
+        setTimeout(() => attemptFocus(attempt + 1), 500);
+      }
+    };
+
+    // Start with a longer delay for the first attempt to ensure graph is rendered
+    setTimeout(() => attemptFocus(1), 1000);
+  };
+
+  // Focus on polling changes (non-editable - sets pollingFocusNode)
+  focusOnPollingNode = (nodeName, graphData) => {
+    console.log(`focusOnPollingNode called with nodeName: ${nodeName}`);
+    console.log(`Graph data has ${graphData.nodes.length} nodes`);
+    
+    const attemptFocus = (attempt = 1) => {
+      if (attempt > 5) {
+        console.log(`Failed to focus on polling node after 5 attempts: ${nodeName}`);
+        return;
+      }
+
+      const newNode = graphData.nodes.find((n) => n.name === nodeName);
+      if (!newNode) {
+        console.log(`Polling node ${nodeName} not found in graph data, attempt ${attempt}`);
+        setTimeout(() => attemptFocus(attempt + 1), 500);
+        return;
+      }
+
+      if (!this.fgRef.current) {
+        console.log(`Graph reference not ready, attempt ${attempt}`);
+        setTimeout(() => attemptFocus(attempt + 1), 500);
+        return;
+      }
+
+      try {
+        console.log(`Focusing on polling node: ${nodeName} at (${newNode.x}, ${newNode.y})`);
+        this.fgRef.current.centerAt(newNode.x, newNode.y, 1500);
+        this.fgRef.current.zoom(1.25);
+        
+        // Set pollingFocusNode (non-editable)
+        this.setState({ pollingFocusNode: nodeName });
+        console.log(`Successfully focused on polling node: ${nodeName}`);
+      } catch (error) {
+        console.log(`Polling focus attempt failed, retrying: ${error.message}`);
         setTimeout(() => attemptFocus(attempt + 1), 500);
       }
     };
@@ -695,6 +750,12 @@ class CypherViz extends React.Component {
     // Clear processing mutation state
     this.setState({ processingMutation: false });
     
+    // Clear polling focus timeout
+    if (this.pollingFocusTimeout) {
+      clearTimeout(this.pollingFocusTimeout);
+      this.pollingFocusTimeout = null;
+    }
+    
     // Stop idle detection
     this.stopIdleDetection();
     
@@ -845,6 +906,7 @@ class CypherViz extends React.Component {
         loadData={this.loadData} 
         fgRef={this.fgRef} 
         latestNode={this.state.latestNode} 
+        pollingFocusNode={this.state.pollingFocusNode}
     driver={this.driver} // Pass the driver
         processingMutation={this.state.processingMutation}
         updateUserActivity={this.updateUserActivity}
@@ -891,7 +953,7 @@ const NFCTrigger = ({ addNode }) => {
         return <div style={{ textAlign: "center", padding: "20px", fontSize: "16px", color: "red" }}>Adding you to {username}'s network...</div>
       };
 
-              const GraphView = ({ data, handleChange, loadData, fgRef, latestNode, driver, processingMutation, updateUserActivity, isUserActive }) => {
+              const GraphView = ({ data, handleChange, loadData, fgRef, latestNode, pollingFocusNode, driver, processingMutation, updateUserActivity, isUserActive }) => {
         const [inputValue, setInputValue] = useState(""); 
         const [selectedNode, setSelectedNode] = useState(null);
         const [editedNode, setEditedNode] = useState(null);
