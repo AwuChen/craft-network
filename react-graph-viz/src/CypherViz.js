@@ -417,9 +417,7 @@ class CypherViz extends React.Component {
         this.focusOnNewNode(newNodeName, updatedData);
       } else if (this.changedNodesFromPolling.length > 0 && !this.isInitialLoad) {
         // Focus on the first changed node from polling (but not on initial load) - non-editable
-        console.log(`Changed nodes array before focusing: ${this.changedNodesFromPolling.join(', ')}`);
         const firstChangedNode = this.changedNodesFromPolling[0];
-        console.log(`Focusing on changed node from polling: ${firstChangedNode}`);
         this.focusOnPollingNode(firstChangedNode, updatedData);
         
         // Set a 10-second timeout to clear the focus
@@ -427,14 +425,12 @@ class CypherViz extends React.Component {
           clearTimeout(this.pollingFocusTimeout);
         }
         this.pollingFocusTimeout = setTimeout(() => {
-          console.log(`Clearing polling focus after 10 seconds`);
           this.setState({ pollingFocusNode: null });
           this.pollingFocusTimeout = null;
         }, 10000); // 10 seconds
         
         // Clear the changed nodes list after focusing
         this.changedNodesFromPolling = [];
-        console.log(`Changed nodes array cleared after focusing`);
       }
     });
     } else {
@@ -449,38 +445,30 @@ class CypherViz extends React.Component {
 
     // Focus on a newly added node with multiple attempts
   focusOnNewNode = (nodeName, graphData) => {
-    console.log(`focusOnNewNode called with nodeName: ${nodeName}`);
-    console.log(`Graph data has ${graphData.nodes.length} nodes`);
     
     const attemptFocus = (attempt = 1) => {
       if (attempt > 5) {
-        console.log(`Failed to focus on node after 5 attempts: ${nodeName}`);
         return;
       }
 
       const newNode = graphData.nodes.find((n) => n.name === nodeName);
       if (!newNode) {
-        console.log(`Node ${nodeName} not found in graph data, attempt ${attempt}`);
         setTimeout(() => attemptFocus(attempt + 1), 500);
         return;
       }
 
       if (!this.fgRef.current) {
-        console.log(`Graph reference not ready, attempt ${attempt}`);
         setTimeout(() => attemptFocus(attempt + 1), 500);
         return;
       }
 
       try {
-        console.log(`Focusing on node: ${nodeName} at (${newNode.x}, ${newNode.y})`);
             this.fgRef.current.centerAt(newNode.x, newNode.y, 1500);
             this.fgRef.current.zoom(1.25);
         
         // Also ensure the latestNode state is set
         this.setState({ latestNode: nodeName });
-        console.log(`Successfully focused on node: ${nodeName}`);
       } catch (error) {
-        console.log(`Focus attempt failed, retrying: ${error.message}`);
         setTimeout(() => attemptFocus(attempt + 1), 500);
       }
     };
@@ -491,38 +479,30 @@ class CypherViz extends React.Component {
 
   // Focus on polling changes (non-editable - sets pollingFocusNode)
   focusOnPollingNode = (nodeName, graphData) => {
-    console.log(`focusOnPollingNode called with nodeName: ${nodeName}`);
-    console.log(`Graph data has ${graphData.nodes.length} nodes`);
     
     const attemptFocus = (attempt = 1) => {
       if (attempt > 5) {
-        console.log(`Failed to focus on polling node after 5 attempts: ${nodeName}`);
         return;
       }
 
       const newNode = graphData.nodes.find((n) => n.name === nodeName);
       if (!newNode) {
-        console.log(`Polling node ${nodeName} not found in graph data, attempt ${attempt}`);
         setTimeout(() => attemptFocus(attempt + 1), 500);
         return;
       }
 
       if (!this.fgRef.current) {
-        console.log(`Graph reference not ready, attempt ${attempt}`);
         setTimeout(() => attemptFocus(attempt + 1), 500);
         return;
       }
 
       try {
-        console.log(`Focusing on polling node: ${nodeName} at (${newNode.x}, ${newNode.y})`);
         this.fgRef.current.centerAt(newNode.x, newNode.y, 1500);
         this.fgRef.current.zoom(1.25);
         
         // Set pollingFocusNode (non-editable)
         this.setState({ pollingFocusNode: nodeName });
-        console.log(`Successfully focused on polling node: ${nodeName}`);
       } catch (error) {
-        console.log(`Polling focus attempt failed, retrying: ${error.message}`);
         setTimeout(() => attemptFocus(attempt + 1), 500);
       }
     };
@@ -559,14 +539,10 @@ class CypherViz extends React.Component {
     let changedNodes = [];
     let hasChanges = false;
     
-    console.log(`Change detection - Old nodes: ${oldData.nodes.length}, New nodes: ${newData.nodes.length}`);
-    console.log(`Change detection - Old links: ${oldData.links.length}, New links: ${newData.links.length}`);
-    
     // Check if number of nodes or links changed
     if (newData.nodes.length !== oldData.nodes.length || 
         newData.links.length !== oldData.links.length) {
       hasChanges = true;
-      console.log(`Change detected: Node count or link count changed`);
     }
     
     // Check if any node properties changed
@@ -577,14 +553,12 @@ class CypherViz extends React.Component {
         // New node added
         changedNodes.push(newNode.name);
         hasChanges = true;
-        console.log(`New node detected: ${newNode.name}`);
       } else if (oldNode.role !== newNode.role || 
                  oldNode.location !== newNode.location || 
                  oldNode.website !== newNode.website) {
         // Existing node modified
         changedNodes.push(newNode.name);
         hasChanges = true;
-        console.log(`Modified node detected: ${newNode.name}`);
       }
     }
     
@@ -603,18 +577,14 @@ class CypherViz extends React.Component {
         if (!changedNodes.includes(source)) changedNodes.push(source);
         if (!changedNodes.includes(target)) changedNodes.push(target);
         hasChanges = true;
-        console.log(`New link detected: ${source} -> ${target}`);
       }
     }
     
     // Store changed nodes for focusing
     if (hasChanges && changedNodes.length > 0) {
-      console.log(`Setting changedNodesFromPolling to: ${changedNodes.join(', ')}`);
       this.changedNodesFromPolling = changedNodes;
-      console.log(`Changed nodes from polling: ${changedNodes.join(', ')}`);
     }
     
-    console.log(`Change detection result: hasChanges=${hasChanges}, changedNodes=${changedNodes.length}`);
     return hasChanges;
   };
 
@@ -628,14 +598,11 @@ class CypherViz extends React.Component {
     this.pollingInterval = setInterval(() => {
       // Only poll if the tab is active (to save resources)
       if (!document.hidden) {
-        console.log(`Polling triggered - checking for changes`);
         // Use default query for polling, but respect custom query state, mutation processing, and NFC operations
         if (this.state.customQueryActive || this.state.processingMutation || this.isNFCOperation) {
-          console.log(`Polling skipped - customQueryActive: ${this.state.customQueryActive}, processingMutation: ${this.state.processingMutation}, isNFCOperation: ${this.isNFCOperation}`);
           return;
         }
         // Don't preserve latestNode during polling - let change detection determine focus
-        console.log(`Polling with null newNodeName to let change detection work`);
         this.loadData(null, this.defaultQuery);
       }
     }, 5000); // Check every 5 seconds
@@ -932,7 +899,6 @@ const NFCTrigger = ({ addNode }) => {
       console.log(`NFC Trigger: Starting NFC operation for ${username} with new user ${newUser}`);
 
       try {
-        console.log(`NFC Trigger: Calling addNode...`);
         await addNode(newUser, username); // pass dynamic user
         console.log(`NFC Trigger: addNode completed successfully`);
         } catch (error) {
@@ -940,13 +906,11 @@ const NFCTrigger = ({ addNode }) => {
           return;
         }
 
-        console.log(`NFC Trigger: Redirecting in 2 seconds...`);
         setTimeout(() => {
           window.location.assign("/craft-network/#/");
           }, 2000);
         };
 
-        console.log(`NFC Trigger: Starting addAndRedirect...`);
         addAndRedirect();
         }, [location, username]);
 
@@ -1243,7 +1207,6 @@ const NFCTrigger = ({ addNode }) => {
             
             // If it's a mutation query, immediately return to default state
             if (isMutationQuery) {
-              console.log("Mutation query from Flowise detected, immediately returning to default state");
               
               // Extract node names from the mutation query to track what was created/modified
               let extractedNodes = [];
