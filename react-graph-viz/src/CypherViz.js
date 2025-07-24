@@ -138,7 +138,7 @@ class CypherViz extends React.Component {
   };
 
   loadData = async (newNodeName = null, queryOverride = null) => {
-    console.log(`loadData called with newNodeName: ${newNodeName}, queryOverride: ${queryOverride ? 'custom' : 'default'}`);
+
     let session = this.driver.session({ database: "neo4j" });
     let res;
     
@@ -1435,7 +1435,14 @@ return (
     const isNDegree = visibilityNodes.has(node.name);
 
     ctx.globalAlpha = isNDegree ? 1.0 : 0.2;
-    ctx.fillStyle = node.name === latestNode ? "black" : "white";
+    // Use latestNode for editing (black), pollingFocusNode for viewing (blue), or white for normal
+    let fillColor = "white";
+    if (node.name === latestNode) {
+      fillColor = "black"; // Editable node
+    } else if (node.name === pollingFocusNode) {
+      fillColor = "gray"; // Non-editable polling focus
+    }
+    ctx.fillStyle = fillColor;
     ctx.strokeStyle = isHighlighted ? "red" : "black";
     ctx.lineWidth = isHighlighted ? 3 : 2;
 
