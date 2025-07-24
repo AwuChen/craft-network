@@ -49,6 +49,8 @@ class CypherViz extends React.Component {
     this.idleTimeout = null;
     this.idleCheckInterval = null;
     this.isNFCOperation = false; // Flag to prevent double reload during NFC operations
+    this.changedNodesFromPolling = []; // Track nodes changed during polling
+    this.isInitialLoad = true; // Flag to prevent focusing on initial load
 
   }
 
@@ -134,6 +136,7 @@ class CypherViz extends React.Component {
   };
 
   loadData = async (newNodeName = null, queryOverride = null) => {
+    console.log(`loadData called with newNodeName: ${newNodeName}, queryOverride: ${queryOverride ? 'custom' : 'default'}`);
     let session = this.driver.session({ database: "neo4j" });
     let res;
     
@@ -366,8 +369,8 @@ class CypherViz extends React.Component {
     const currentDataHash = this.calculateDataHash(updatedData);
     const hasChanged = this.lastDataHash !== currentDataHash;
     
-    // Also use more detailed change detection
-    const hasDetailedChange = this.hasDataChanged(updatedData, this.state.data);
+    // Also use more detailed change detection (but not during initial load)
+    const hasDetailedChange = this.isInitialLoad ? false : this.hasDataChanged(updatedData, this.state.data);
     
     // Additional check: if the data is exactly the same, don't update
     const isDataIdentical = JSON.stringify(updatedData) === JSON.stringify(this.state.data);
@@ -394,8 +397,14 @@ class CypherViz extends React.Component {
       this.lastUpdateTime = now;
       this.updateCount++;
       
+      // Mark initial load as complete after first successful update
+      if (this.isInitialLoad) {
+        this.isInitialLoad = false;
+      }
+      
       // Preserve latestNode if newNodeName is null but we have a valid latestNode
-      const nodeToSet = newNodeName || this.state.latestNode;
+      // Don't set latestNode during initial load
+      const nodeToSet = this.isInitialLoad ? null : (newNodeName || this.state.latestNode);
       this.setState({ 
         data: updatedData, 
         latestNode: nodeToSet,
@@ -404,6 +413,15 @@ class CypherViz extends React.Component {
       if (newNodeName) {
         // Focus on the new node with multiple attempts to ensure it works
         this.focusOnNewNode(newNodeName, updatedData);
+      } else if (this.changedNodesFromPolling.length > 0 && !this.isInitialLoad) {
+        // Focus on the first changed node from polling (but not on initial load)
+        console.log(`Changed nodes array before focusing: ${this.changedNodesFromPolling.join(', ')}`);
+        const firstChangedNode = this.changedNodesFromPolling[0];
+        console.log(`Focusing on changed node from polling: ${firstChangedNode}`);
+        this.focusOnNewNode(firstChangedNode, updatedData);
+        // Clear the changed nodes list after focusing
+        this.changedNodesFromPolling = [];
+        console.log(`Changed nodes array cleared after focusing`);
       }
     });
     } else {
@@ -416,37 +434,55 @@ class CypherViz extends React.Component {
     }
   };
 
-  // Focus on a newly added node with multiple attempts
+    // Focus on a newly added node with multiple attempts
   focusOnNewNode = (nodeName, graphData) => {
+    console.log(`focusOnNewNode called with nodeName: ${nodeName}`);
+    console.log(`Graph data has ${graphData.nodes.length} nodes`);
+    
     const attemptFocus = (attempt = 1) => {
       if (attempt > 5) {
+        console.log(`Failed to focus on node after 5 attempts: ${nodeName}`);
         return;
       }
 
       const newNode = graphData.nodes.find((n) => n.name === nodeName);
       if (!newNode) {
+        console.log(`Node ${nodeName} not found in graph data, attempt ${attempt}`);
         setTimeout(() => attemptFocus(attempt + 1), 500);
         return;
       }
 
       if (!this.fgRef.current) {
+        console.log(`Graph reference not ready, attempt ${attempt}`);
         setTimeout(() => attemptFocus(attempt + 1), 500);
         return;
       }
 
       try {
-        this.fgRef.current.centerAt(newNode.x, newNode.y, 1500);
-        this.fgRef.current.zoom(1.25);
+        console.log(`Focusing on node: ${nodeName} at (${newNode.x}, ${newNode.y})`);
+            this.fgRef.current.centerAt(newNode.x, newNode.y, 1500);
+            this.fgRef.current.zoom(1.25);
         
         // Also ensure the latestNode state is set
         this.setState({ latestNode: nodeName });
+        console.log(`Successfully focused on node: ${nodeName}`);
       } catch (error) {
+        console.log(`Focus attempt failed, retrying: ${error.message}`);
         setTimeout(() => attemptFocus(attempt + 1), 500);
       }
     };
 
     // Start with a longer delay for the first attempt to ensure graph is rendered
     setTimeout(() => attemptFocus(1), 1000);
+  };
+
+  // Focus on multiple nodes (for future use)
+  focusOnMultipleNodes = (nodeNames, graphData) => {
+    if (!nodeNames || nodeNames.length === 0) return;
+    
+    // For now, focus on the first node
+    // In the future, this could calculate a bounding box of all nodes
+    this.focusOnNewNode(nodeNames[0], graphData);
   };
 
   // Calculate a simple hash of the graph data for change detection
@@ -461,25 +497,39 @@ class CypherViz extends React.Component {
     return `${nodesStr}|${linksStr}`;
   };
 
-  // More detailed change detection
+  // More detailed change detection with change tracking
   hasDataChanged = (newData, oldData) => {
     if (!oldData || !oldData.nodes || !oldData.links) return true;
+    
+    let changedNodes = [];
+    let hasChanges = false;
+    
+    console.log(`Change detection - Old nodes: ${oldData.nodes.length}, New nodes: ${newData.nodes.length}`);
+    console.log(`Change detection - Old links: ${oldData.links.length}, New links: ${newData.links.length}`);
     
     // Check if number of nodes or links changed
     if (newData.nodes.length !== oldData.nodes.length || 
         newData.links.length !== oldData.links.length) {
-      return true;
+      hasChanges = true;
+      console.log(`Change detected: Node count or link count changed`);
     }
     
     // Check if any node properties changed
     const oldNodesMap = new Map(oldData.nodes.map(n => [n.name, n]));
     for (const newNode of newData.nodes) {
       const oldNode = oldNodesMap.get(newNode.name);
-      if (!oldNode || 
-          oldNode.role !== newNode.role || 
-          oldNode.location !== newNode.location || 
-          oldNode.website !== newNode.website) {
-        return true;
+      if (!oldNode) {
+        // New node added
+        changedNodes.push(newNode.name);
+        hasChanges = true;
+        console.log(`New node detected: ${newNode.name}`);
+      } else if (oldNode.role !== newNode.role || 
+                 oldNode.location !== newNode.location || 
+                 oldNode.website !== newNode.website) {
+        // Existing node modified
+        changedNodes.push(newNode.name);
+        hasChanges = true;
+        console.log(`Modified node detected: ${newNode.name}`);
       }
     }
     
@@ -494,11 +544,23 @@ class CypherViz extends React.Component {
       const source = typeof newLink.source === 'object' ? newLink.source.name : newLink.source;
       const target = typeof newLink.target === 'object' ? newLink.target.name : newLink.target;
       if (!oldLinksSet.has(`${source}:${target}`)) {
-        return true;
+        // New link added - focus on both source and target nodes
+        if (!changedNodes.includes(source)) changedNodes.push(source);
+        if (!changedNodes.includes(target)) changedNodes.push(target);
+        hasChanges = true;
+        console.log(`New link detected: ${source} -> ${target}`);
       }
     }
     
-    return false;
+    // Store changed nodes for focusing
+    if (hasChanges && changedNodes.length > 0) {
+      console.log(`Setting changedNodesFromPolling to: ${changedNodes.join(', ')}`);
+      this.changedNodesFromPolling = changedNodes;
+      console.log(`Changed nodes from polling: ${changedNodes.join(', ')}`);
+    }
+    
+    console.log(`Change detection result: hasChanges=${hasChanges}, changedNodes=${changedNodes.length}`);
+    return hasChanges;
   };
 
   // Start polling for changes
@@ -511,13 +573,15 @@ class CypherViz extends React.Component {
     this.pollingInterval = setInterval(() => {
       // Only poll if the tab is active (to save resources)
       if (!document.hidden) {
-                // Use default query for polling, but respect custom query state, mutation processing, and NFC operations
+        console.log(`Polling triggered - checking for changes`);
+        // Use default query for polling, but respect custom query state, mutation processing, and NFC operations
         if (this.state.customQueryActive || this.state.processingMutation || this.isNFCOperation) {
+          console.log(`Polling skipped - customQueryActive: ${this.state.customQueryActive}, processingMutation: ${this.state.processingMutation}, isNFCOperation: ${this.isNFCOperation}`);
           return;
         }
-        // Preserve the latestNode when polling (don't pass null)
-        const preserveLatestNode = this.state.latestNode;
-        this.loadData(preserveLatestNode, this.defaultQuery);
+        // Don't preserve latestNode during polling - let change detection determine focus
+        console.log(`Polling with null newNodeName to let change detection work`);
+        this.loadData(null, this.defaultQuery);
       }
     }, 5000); // Check every 5 seconds
     
@@ -1417,3 +1481,4 @@ return (
 
 
     export default CypherViz;
+
