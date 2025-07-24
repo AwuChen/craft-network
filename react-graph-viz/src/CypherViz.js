@@ -1286,6 +1286,11 @@ const NFCTrigger = ({ addNode }) => {
               await loadData(null, defaultQuery);
             }
             
+            // Clear the input after 3 seconds
+            setTimeout(() => {
+              setInputValue("");
+            }, 3000);
+            
             } catch (error) {
               console.error("Flowise call failed:", error);
             }
@@ -1362,15 +1367,19 @@ const NFCTrigger = ({ addNode }) => {
 
 return (
     <div width="95%">
-      <form onSubmit={handleSubmit}>
-        <textarea
-          placeholder="Show me all the artist in Kyoto..."
-          style={{ display: "block", width: "95%", height: "60px", margin: "0 auto", textAlign: "center" }}
-          value={inputValue}
-          onChange={handleInputChange}
-        />
-        <button type="submit">Run</button>
-      </form>
+      <input
+        type="text"
+        placeholder="Show me all the artist in Kyoto..."
+        style={{ display: "block", width: "95%", height: "40px", margin: "0 auto", textAlign: "center", padding: "8px", border: "1px solid #ccc", borderRadius: "4px" }}
+        value={inputValue}
+        onChange={handleInputChange}
+        onKeyPress={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            handleSubmit(e);
+          }
+        }}
+      />
       <button id="visualize" onClick={() => window.open("https://awuchen.github.io/craft-network-3d/", "_blank")}>Visualize3D</button>
       <button id="info" onClick={() => window.open("https://www.hako.soooul.xyz/drafts/washi", "_blank")}>Info</button>
       
@@ -1440,7 +1449,7 @@ return (
     if (node.name === latestNode) {
       fillColor = "black"; // Editable node
     } else if (node.name === pollingFocusNode) {
-      fillColor = "gray"; // Non-editable polling focus
+      fillColor = "green"; // Non-editable polling focus
     }
     ctx.fillStyle = fillColor;
     ctx.strokeStyle = isHighlighted ? "red" : "black";
