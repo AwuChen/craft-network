@@ -1,27 +1,44 @@
-# React Graph Viz
-This project shows how to use [2d-force-graph react components](https://github.com/vasturiano/react-force-graph) with a [Neo4j Database](https://neo4j.com/developer).
+# React Graph Visualization
 
-A Cypher query from a textarea is used to query the database.
-The results are then rendered as graph visualization.
+A React-based graph visualization tool that connects to Neo4j database and provides real-time network visualization with interactive features.
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## Features
 
-## Available Scripts
+- **Real-time Graph Visualization**: Displays network data from Neo4j database
+- **Interactive Node Editing**: Click on nodes to view and edit their properties
+- **Search Functionality**: Natural language search with AI-powered query generation
+- **NFC Integration**: Add new users to the network via NFC triggers
+- **Polling Updates**: Automatic updates every 5 seconds to show new connections
+- **Idle Animation**: Subtle swaying motion when user is inactive for 5+ seconds
+- **3D Visualization**: Link to 3D graph visualization
 
-In the project directory, you can run:
+## Idle Animation
 
-### `yarn start`
+The application includes a subtle idle animation that activates when the user is inactive for 5 seconds. The animation:
 
-Runs the app in the development mode.<br />
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+- Applies gentle circular forces to nodes creating a swaying motion
+- Preserves the original graph structure and connections
+- Automatically stops when user activity is detected
+- Uses the existing D3 force simulation system for smooth performance
 
-The page will reload if you make edits.<br />
-You will also see any lint errors in the console.
+## Installation
 
-### `yarn build`
+```bash
+npm install
+```
 
-Builds the app for production to the `build` folder.<br />
-It correctly bundles React in production mode and optimizes the build for the best performance.
-Your app is ready to be deployed!
+## Usage
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+```bash
+npm start
+```
+
+The application will start on `http://localhost:3000`
+
+## Dependencies
+
+- React
+- react-force-graph-2d
+- d3 (for force simulation)
+- neo4j-driver
+- react-router-dom

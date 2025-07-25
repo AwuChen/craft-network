@@ -30,7 +30,7 @@ class CypherViz extends React.Component {
       processingMutation: false,
       lastUserActivity: Date.now(),
       isUserActive: true,
-
+      idleAnimationActive: false, // New state for idle animation
     };
 
     // Store the default query for polling (separate from user input)
@@ -53,7 +53,12 @@ class CypherViz extends React.Component {
     this.changedNodesFromPolling = []; // Track nodes changed during polling
     this.isInitialLoad = true; // Flag to prevent focusing on initial load
     this.pollingFocusTimeout = null; // Timeout to clear polling focus
-
+    
+    // Idle animation properties
+    this.idleForceMagnitude = 0.15; // Reduced force magnitude for subtlety
+    this.idleAnimationInterval = null; // Track the continuous animation interval
+    this.idleAnimationStartTime = null; // Track when animation started for fade-in
+    this.idleFadeInDuration = 3000; // 3 seconds fade-in duration
   }
 
 
@@ -61,10 +66,28 @@ class CypherViz extends React.Component {
   // Update user activity timestamp
   updateUserActivity = () => {
     const now = Date.now();
+    const wasActive = this.state.isUserActive;
+    
     this.setState({ 
       lastUserActivity: now,
       isUserActive: true 
     });
+    
+    // Stop idle animation if user becomes active
+    if (!wasActive && this.state.idleAnimationActive) {
+      this.stopIdleAnimation();
+    }
+    
+    // Resume polling if it was stopped due to idle state
+    if (!wasActive && this.state.isPolling) {
+      // The polling interval is still running, but now it will execute again
+      // since we've set isUserActive to true
+    }
+    
+    // Ensure idle animation is stopped when user becomes active
+    if (!wasActive && this.state.idleAnimationActive) {
+      this.stopIdleAnimation();
+    }
     
     // Clear existing idle timeout
     if (this.idleTimeout) {
@@ -74,6 +97,7 @@ class CypherViz extends React.Component {
     // Set new idle timeout (5 seconds of inactivity)
     this.idleTimeout = setTimeout(() => {
       this.setState({ isUserActive: false });
+      this.startIdleAnimation();
     }, 5000); // 5 seconds of inactivity
   };
 
@@ -135,6 +159,9 @@ class CypherViz extends React.Component {
       clearTimeout(this.idleTimeout);
       this.idleTimeout = null;
     }
+    
+    // Stop idle animation
+    this.stopIdleAnimation();
   };
 
   loadData = async (newNodeName = null, queryOverride = null) => {
@@ -362,11 +389,6 @@ class CypherViz extends React.Component {
     const nodes = Array.from(nodesMap.values());
     const updatedData = { nodes, links };
     
-    // Check if our NFC node is in the parsed results
-    if (this.pendingNFCNode) {
-      const nfcNodeInResults = nodes.find(n => n.name === this.pendingNFCNode);
-    }
-
     // Calculate hash of current data for change detection
     const currentDataHash = this.calculateDataHash(updatedData);
     const hasChanged = this.lastDataHash !== currentDataHash;
@@ -390,10 +412,15 @@ class CypherViz extends React.Component {
     // Force update if we have a newNodeName (NFC operation) regardless of debounce
     const forceUpdateForNFC = newNodeName && this.pendingNFCNode && newNodeName === this.pendingNFCNode;
     
+    // Don't update state during idle periods unless there's an actual change
+    const isIdlePeriod = !this.state.isUserActive;
+    const shouldUpdateDuringIdle = hasChanged || hasDetailedChange || forceUpdateForNFC;
+    
     if ((hasChanged || hasDetailedChange || this.lastDataHash === null || forceUpdateForNFC) && 
         !isDataIdentical &&
         (timeSinceLastUpdate > this.updateDebounceTime || this.lastDataHash === null || forceUpdateForNFC) &&
-        this.updateCount < this.maxUpdatesPerCycle) {
+        this.updateCount < this.maxUpdatesPerCycle &&
+        (!isIdlePeriod || shouldUpdateDuringIdle)) {
       // Update the hash only when we actually update the state
       this.lastDataHash = currentDataHash;
       this.lastUpdateTime = now;
@@ -431,6 +458,13 @@ class CypherViz extends React.Component {
         
         // Clear the changed nodes list after focusing
         this.changedNodesFromPolling = [];
+      }
+      
+      // Restart idle animation if user is still idle after state update
+      if (!this.state.isUserActive && !this.state.idleAnimationActive) {
+        setTimeout(() => {
+          this.startIdleAnimation();
+        }, 100); // Small delay to ensure state update is complete
       }
     });
     } else {
@@ -723,8 +757,15 @@ class CypherViz extends React.Component {
       this.pollingFocusTimeout = null;
     }
     
-    // Stop idle detection
+    // Stop idle detection and animation
     this.stopIdleDetection();
+    this.stopIdleAnimation();
+    
+    // Clear idle animation interval
+    if (this.idleAnimationInterval) {
+      clearInterval(this.idleAnimationInterval);
+      this.idleAnimationInterval = null;
+    }
     
     // Remove visibility change listener
     if (this.handleVisibilityChange) {
@@ -780,10 +821,8 @@ class CypherViz extends React.Component {
       await this.loadData(capitalizedNewUser, this.defaultQuery);
       
       // Wait for the state to be updated, then focus
-      let checkCount = 0;
       const waitForStateUpdate = () => {
         const nodeExists = this.state.data.nodes.find(n => n.name === capitalizedNewUser);
-        checkCount++;
         
         if (nodeExists) {
           this.focusOnNewNode(capitalizedNewUser, this.state.data);
@@ -857,6 +896,68 @@ class CypherViz extends React.Component {
     
     if (!isValidQuery) {
       this.setState({ query: this.defaultQuery });
+    }
+  };
+
+  // Start idle animation
+  startIdleAnimation = () => {
+    if (this.state.idleAnimationActive || !this.fgRef.current) return;
+    
+    this.setState({ idleAnimationActive: true });
+    this.idleAnimationTime = 0;
+    this.idleAnimationStartTime = Date.now(); // Record start time for fade-in
+    
+    // Use a custom animation loop instead of D3 force simulation
+    this.idleAnimationInterval = setInterval(() => {
+      if (this.state.idleAnimationActive && this.fgRef.current) {
+        const data = this.state.data;
+        const time = Date.now() * 0.0005; // Slower time factor for gentler motion
+        
+        // Calculate fade-in progress (0 to 1 over fadeInDuration)
+        const elapsed = Date.now() - this.idleAnimationStartTime;
+        const fadeProgress = Math.min(elapsed / this.idleFadeInDuration, 1);
+        
+        // Use easing function for smooth fade-in (ease-in-out)
+        const fadeIntensity = fadeProgress < 0.5 
+          ? 2 * fadeProgress * fadeProgress 
+          : 1 - Math.pow(-2 * fadeProgress + 2, 2) / 2;
+        
+        data.nodes.forEach((node, i) => {
+          const angle = time + (node.x * 0.005) + (node.y * 0.005) + (i * 0.05);
+          const baseForceX = Math.cos(angle) * this.idleForceMagnitude * 0.05; // Even gentler base force
+          const baseForceY = Math.sin(angle) * this.idleForceMagnitude * 0.05; // Even gentler base force
+          
+          // Apply fade-in intensity to forces
+          const forceX = baseForceX * fadeIntensity;
+          const forceY = baseForceY * fadeIntensity;
+          
+          // Apply gentle position changes directly
+          node.x += forceX;
+          node.y += forceY;
+        });
+        
+        // Trigger a gentle update to the graph
+        if (this.fgRef.current.d3ReheatSimulation) {
+          this.fgRef.current.d3ReheatSimulation();
+        }
+      } else {
+        // Stop the interval if animation is no longer active
+        if (this.idleAnimationInterval) {
+          clearInterval(this.idleAnimationInterval);
+          this.idleAnimationInterval = null;
+        }
+      }
+    }, 50); // Update every 50ms for smooth animation
+  };
+
+  // Stop idle animation
+  stopIdleAnimation = () => {
+    this.setState({ idleAnimationActive: false });
+    
+    // Clear the continuous animation interval
+    if (this.idleAnimationInterval) {
+      clearInterval(this.idleAnimationInterval);
+      this.idleAnimationInterval = null;
     }
   };
 
