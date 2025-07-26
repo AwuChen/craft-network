@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import './App.css';
 import ForceGraph2D from 'react-force-graph-2d';
+import * as d3 from 'd3';
 
 class CypherViz extends React.Component {
   constructor({ driver }) {
@@ -53,18 +54,135 @@ class CypherViz extends React.Component {
     this.changedNodesFromPolling = []; // Track nodes changed during polling
     this.isInitialLoad = true; // Flag to prevent focusing on initial load
     this.pollingFocusTimeout = null; // Timeout to clear polling focus
+    this.breathingAnimation = null; // For breathing animation
+    this.breathingState = 'expanded'; // 'contracted' or 'expanded'
+    this.breathingInterval = null; // Interval for breathing cycle
+    this.scaleTransitionStart = null; // For smooth scaling transition
+    this.scaleTransitionDuration = 1000; // 1 second transition
 
   }
 
+  // Breathing animation methods
+  startBreathingAnimation = () => {
+    if (this.breathingInterval) {
+      clearInterval(this.breathingInterval);
+    }
+    
+    // Start breathing cycle every 4 seconds
+    this.breathingInterval = setInterval(() => {
+      if (!this.state.isUserActive && this.fgRef.current) {
+        this.triggerBreathingCycle();
+      }
+    }, 4000); // 4 second cycle
+  };
 
+  stopBreathingAnimation = () => {
+    if (this.breathingInterval) {
+      clearInterval(this.breathingInterval);
+      this.breathingInterval = null;
+    }
+    
+    // Reset to expanded state when stopping and clean up forces
+    if (this.fgRef.current && this.breathingState === 'contracted') {
+      this.expandNodes();
+    }
+  };
+
+  triggerBreathingCycle = () => {
+    if (this.breathingState === 'expanded') {
+      this.contractNodes();
+    } else {
+      this.expandNodes();
+    }
+  };
+
+  contractNodes = () => {
+    if (!this.fgRef.current) return;
+    
+    this.breathingState = 'contracted';
+    
+    // Get the current graph instance
+    const graph = this.fgRef.current;
+    
+    // Start with very low strength and gradually increase for smooth transition
+    let currentStrength = 0.01;
+    const targetStrength = 0.05;
+    const rampDuration = 2000; // 2 seconds to ramp up
+    const rampSteps = 20;
+    const strengthIncrement = (targetStrength - currentStrength) / rampSteps;
+    const stepInterval = rampDuration / rampSteps;
+    
+    const rampUpForce = () => {
+      if (currentStrength < targetStrength) {
+        currentStrength += strengthIncrement;
+        graph.d3Force('breathing-attraction', d3.forceRadial(0, 0, 10).strength(currentStrength));
+        graph.d3ReheatSimulation();
+        setTimeout(rampUpForce, stepInterval);
+      }
+    };
+    
+    // Start the gradual ramp-up
+    rampUpForce();
+    
+    // After 10 seconds, expand back (5x slower)
+    setTimeout(() => {
+      this.expandNodes();
+    }, 10000);
+  };
+
+  expandNodes = () => {
+    if (!this.fgRef.current) return;
+    
+    this.breathingState = 'expanded';
+    
+    // Get the current graph instance
+    const graph = this.fgRef.current;
+    
+    // Gradually reduce the breathing force for smooth expansion
+    const currentForce = graph.d3Force('breathing-attraction');
+    if (currentForce) {
+      let currentStrength = 0.05;
+      const rampDuration = 2000; // 2 seconds to ramp down
+      const rampSteps = 20;
+      const strengthDecrement = currentStrength / rampSteps;
+      const stepInterval = rampDuration / rampSteps;
+      
+      const rampDownForce = () => {
+        if (currentStrength > 0.001) {
+          currentStrength -= strengthDecrement;
+          graph.d3Force('breathing-attraction', d3.forceRadial(0, 0, 10).strength(currentStrength));
+          graph.d3ReheatSimulation();
+          setTimeout(rampDownForce, stepInterval);
+        } else {
+          // Completely remove the force when it's very small
+          graph.d3Force('breathing-attraction', null);
+          graph.d3ReheatSimulation();
+        }
+      };
+      
+      // Start the gradual ramp-down
+      rampDownForce();
+    }
+  };
 
   // Update user activity timestamp
   updateUserActivity = () => {
     const now = Date.now();
+    const wasActive = this.state.isUserActive;
+    
     this.setState({ 
       lastUserActivity: now,
       isUserActive: true 
     });
+    
+    // If user just became active, stop breathing animation and start scale transition immediately
+    if (!wasActive) {
+      this.stopBreathingAnimation();
+      // Capture the exact breathing state at this moment to prevent jitter
+      this.scaleTransitionStart = now;
+      // Force an immediate re-render to start the transition
+      this.forceUpdate();
+    }
     
     // Clear existing idle timeout
     if (this.idleTimeout) {
@@ -74,6 +192,8 @@ class CypherViz extends React.Component {
     // Set new idle timeout (5 seconds of inactivity)
     this.idleTimeout = setTimeout(() => {
       this.setState({ isUserActive: false });
+      // Start breathing animation when user becomes idle
+      this.startBreathingAnimation();
     }, 5000); // 5 seconds of inactivity
   };
 
@@ -723,6 +843,9 @@ class CypherViz extends React.Component {
       this.pollingFocusTimeout = null;
     }
     
+    // Stop breathing animation
+    this.stopBreathingAnimation();
+    
     // Stop idle detection
     this.stopIdleDetection();
     
@@ -878,6 +1001,8 @@ class CypherViz extends React.Component {
         processingMutation={this.state.processingMutation}
         updateUserActivity={this.updateUserActivity}
         isUserActive={this.state.isUserActive}
+        scaleTransitionStart={this.scaleTransitionStart}
+        scaleTransitionDuration={this.scaleTransitionDuration}
     />
   } />
   </Routes>
@@ -917,7 +1042,7 @@ const NFCTrigger = ({ addNode }) => {
         return <div style={{ textAlign: "center", padding: "20px", fontSize: "16px", color: "red" }}>Adding you to {username}'s network...</div>
       };
 
-              const GraphView = ({ data, handleChange, loadData, fgRef, latestNode, pollingFocusNode, driver, processingMutation, updateUserActivity, isUserActive }) => {
+              const GraphView = ({ data, handleChange, loadData, fgRef, latestNode, pollingFocusNode, driver, processingMutation, updateUserActivity, isUserActive, scaleTransitionStart, scaleTransitionDuration }) => {
         const [inputValue, setInputValue] = useState(""); 
         const [selectedNode, setSelectedNode] = useState(null);
         const [editedNode, setEditedNode] = useState(null);
@@ -1374,6 +1499,33 @@ return (
           Processing Mutation...
         </div>
       )}
+
+      {/* Breathing animation indicator */}
+      {!isUserActive && (
+        <div style={{
+          position: "fixed",
+          top: "60px",
+          left: "10px",
+          padding: "8px 12px",
+          backgroundColor: "#4CAF50",
+          color: "white",
+          borderRadius: "4px",
+          fontSize: "12px",
+          zIndex: 1000,
+          display: "flex",
+          alignItems: "center",
+          gap: "8px"
+        }}>
+          <div style={{
+            width: "8px",
+            height: "8px",
+            borderRadius: "50%",
+            backgroundColor: "#fff",
+            animation: "breathe 4s ease-in-out infinite"
+          }}></div>
+          Network Breathing...
+        </div>
+      )}
       
 
       
@@ -1382,6 +1534,17 @@ return (
           0% { opacity: 1; }
           50% { opacity: 0.5; }
           100% { opacity: 1; }
+        }
+        
+        @keyframes breathe {
+          0%, 100% { 
+            transform: scale(1);
+            opacity: 1;
+          }
+          50% { 
+            transform: scale(1.5);
+            opacity: 0.7;
+          }
         }
       `}</style>
 
@@ -1407,6 +1570,26 @@ return (
     const isNDegree = visibilityNodes.has(node.name);
 
     ctx.globalAlpha = isNDegree ? 1.0 : 0.2;
+    
+    // Add breathing effect when user is idle or transitioning
+    let nodeRadius = 6;
+    const now = Date.now();
+    
+    if (!isUserActive) {
+      // Create a subtle breathing effect with time-based scaling
+      const time = now * 0.001; // Convert to seconds
+      const breathingScale = 1 + 0.1 * Math.sin(time * 1.5); // Subtle breathing
+      nodeRadius = 6 * breathingScale;
+    } else if (scaleTransitionStart && (now - scaleTransitionStart) < scaleTransitionDuration) {
+      // Smooth transition back to normal size
+      const transitionProgress = Math.min((now - scaleTransitionStart) / scaleTransitionDuration, 1);
+      // Use the exact breathing scale at the moment transition started
+      const breathingScale = 1 + 0.1 * Math.sin((scaleTransitionStart * 0.001) * 1.5); // Last breathing scale
+      const targetScale = 1; // Normal scale
+      const currentScale = breathingScale + (targetScale - breathingScale) * transitionProgress;
+      nodeRadius = 6 * currentScale;
+    }
+    
     // Use latestNode for editing (black), pollingFocusNode for viewing (blue), or white for normal
     let fillColor = "white";
     if (node.name === latestNode) {
@@ -1414,15 +1597,43 @@ return (
     } else if (node.name === pollingFocusNode) {
       fillColor = "green"; // Non-editable polling focus
     }
+    
+    // Add subtle color shift during breathing animation
+    if (!isUserActive && fillColor === "white") {
+      const time = now * 0.001;
+      const colorShift = Math.sin(time * 1.5) * 0.1;
+      // Shift towards a very light blue during breathing
+      fillColor = `rgb(${255 + colorShift * 50}, ${255 + colorShift * 30}, ${255 + colorShift * 100})`;
+    } else if (scaleTransitionStart && (now - scaleTransitionStart) < scaleTransitionDuration && fillColor === "white") {
+      // Smooth color transition back to normal
+      const transitionProgress = (now - scaleTransitionStart) / scaleTransitionDuration;
+      const lastColorShift = Math.sin((scaleTransitionStart * 0.001) * 1.5) * 0.1;
+      const currentColorShift = lastColorShift * (1 - transitionProgress);
+      fillColor = `rgb(${255 + currentColorShift * 50}, ${255 + currentColorShift * 30}, ${255 + currentColorShift * 100})`;
+    }
+    
+    // Add subtle glow effect during breathing animation
+    if (!isUserActive) {
+      ctx.shadowColor = fillColor;
+      ctx.shadowBlur = 3;
+    } else if (scaleTransitionStart && (now - scaleTransitionStart) < scaleTransitionDuration) {
+      // Smooth glow transition back to normal
+      const transitionProgress = (now - scaleTransitionStart) / scaleTransitionDuration;
+      ctx.shadowColor = fillColor;
+      ctx.shadowBlur = 3 * (1 - transitionProgress);
+    }
+    
     ctx.fillStyle = fillColor;
     ctx.strokeStyle = isHighlighted ? "red" : "black";
     ctx.lineWidth = isHighlighted ? 3 : 2;
 
     ctx.beginPath();
-    ctx.arc(node.x || Math.random() * 500, node.y || Math.random() * 500, 6, 0, 2 * Math.PI);
+    ctx.arc(node.x || Math.random() * 500, node.y || Math.random() * 500, nodeRadius, 0, 2 * Math.PI);
     ctx.fill();
     ctx.stroke();
 
+    // Reset shadow for text
+    ctx.shadowBlur = 0;
     ctx.fillStyle = "gray";
     ctx.fillText(node.role, node.x + 10, node.y);
 

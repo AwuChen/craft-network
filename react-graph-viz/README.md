@@ -4,6 +4,24 @@ This project shows how to use [2d-force-graph react components](https://github.c
 A Cypher query from a textarea is used to query the database.
 The results are then rendered as graph visualization.
 
+## Features
+
+### Interactive Network Graph
+- Real-time graph visualization with Neo4j database integration
+- Node editing and network information display
+- Search functionality with natural language query processing
+- NFC-based node addition system
+
+### Idle Breathing Animation
+When the user is inactive for 5 seconds, the network graph enters a "breathing" state:
+- Nodes are drawn towards the center using enhanced centering forces
+- Subtle visual effects include node scaling, color shifts, and glow effects
+- The animation cycles every 4 seconds (2 seconds contracted, 2 seconds expanded)
+- A visual indicator appears in the top-left corner showing "Network Breathing..."
+- User activity immediately stops the breathing animation and returns to normal state
+
+The breathing animation uses d3-force physics to create natural, organic movement that mimics a living network.
+
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
 ## Available Scripts
