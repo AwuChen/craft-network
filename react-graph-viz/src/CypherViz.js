@@ -1548,17 +1548,21 @@ return (
     let nodeRadius = 6;
     const now = Date.now();
     
+    // Frame rate optimization: only update every 60ms (16fps) for better performance
+    const frameRate = 60;
+    const time = Math.floor(now / frameRate) * frameRate * 0.001;
+    
     if (!isUserActive) {
-      // Create a subtle breathing effect with time-based scaling
-      const time = now * 0.001; // Convert to seconds
-      const breathingScale = 1 + 0.1 * Math.sin(time * 1.5); // Subtle breathing
+      // Optimized breathing effect with cached calculations
+      // Use a simpler sine wave with reduced frequency for better performance
+      const breathingScale = 1 + 0.1 * Math.sin(time * 0.8); // Reduced frequency from 1.5 to 0.8
       nodeRadius = 6 * breathingScale;
     } else if (scaleTransitionStart && (now - scaleTransitionStart) < scaleTransitionDuration) {
-      // Smooth transition back to normal size
+      // Optimized transition with cached calculations
       const transitionProgress = Math.min((now - scaleTransitionStart) / scaleTransitionDuration, 1);
-      // Use the exact breathing scale at the moment transition started
-      const breathingScale = 1 + 0.1 * Math.sin((scaleTransitionStart * 0.001) * 1.5); // Last breathing scale
-      const targetScale = 1; // Normal scale
+      // Cache the breathing scale calculation
+      const breathingScale = 1 + 0.1 * Math.sin((scaleTransitionStart * 0.001) * 0.8);
+      const targetScale = 1;
       const currentScale = breathingScale + (targetScale - breathingScale) * transitionProgress;
       nodeRadius = 6 * currentScale;
     }
@@ -1573,28 +1577,21 @@ return (
     
     // Add subtle color shift during breathing animation
     if (!isUserActive && fillColor === "white") {
-      const time = now * 0.001;
-      const colorShift = Math.sin(time * 1.5) * 0.1;
+      // Optimized color shift with reduced frequency and frame rate optimization
+      const colorShift = Math.sin(time * 0.8) * 0.1;
       // Shift towards a very light blue during breathing
       fillColor = `rgb(${255 + colorShift * 50}, ${255 + colorShift * 30}, ${255 + colorShift * 100})`;
     } else if (scaleTransitionStart && (now - scaleTransitionStart) < scaleTransitionDuration && fillColor === "white") {
-      // Smooth color transition back to normal
+      // Optimized color transition with cached calculations
       const transitionProgress = (now - scaleTransitionStart) / scaleTransitionDuration;
-      const lastColorShift = Math.sin((scaleTransitionStart * 0.001) * 1.5) * 0.1;
+      // Cache the color shift calculation
+      const lastColorShift = Math.sin((scaleTransitionStart * 0.001) * 0.8) * 0.1;
       const currentColorShift = lastColorShift * (1 - transitionProgress);
       fillColor = `rgb(${255 + currentColorShift * 50}, ${255 + currentColorShift * 30}, ${255 + currentColorShift * 100})`;
     }
     
     // Add subtle glow effect during breathing animation
-    if (!isUserActive) {
-      ctx.shadowColor = fillColor;
-      ctx.shadowBlur = 3;
-    } else if (scaleTransitionStart && (now - scaleTransitionStart) < scaleTransitionDuration) {
-      // Smooth glow transition back to normal
-      const transitionProgress = (now - scaleTransitionStart) / scaleTransitionDuration;
-      ctx.shadowColor = fillColor;
-      ctx.shadowBlur = 3 * (1 - transitionProgress);
-    }
+    // Removed shadow and alpha effects for performance
     
     ctx.fillStyle = fillColor;
     ctx.strokeStyle = isHighlighted ? "red" : "black";
