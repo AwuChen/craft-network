@@ -1499,33 +1499,6 @@ return (
           Processing Mutation...
         </div>
       )}
-
-      {/* Breathing animation indicator */}
-      {!isUserActive && (
-        <div style={{
-          position: "fixed",
-          top: "60px",
-          left: "10px",
-          padding: "8px 12px",
-          backgroundColor: "#4CAF50",
-          color: "white",
-          borderRadius: "4px",
-          fontSize: "12px",
-          zIndex: 1000,
-          display: "flex",
-          alignItems: "center",
-          gap: "8px"
-        }}>
-          <div style={{
-            width: "8px",
-            height: "8px",
-            borderRadius: "50%",
-            backgroundColor: "#fff",
-            animation: "breathe 4s ease-in-out infinite"
-          }}></div>
-          Network Breathing...
-        </div>
-      )}
       
 
       
@@ -1575,17 +1548,28 @@ return (
     let nodeRadius = 6;
     const now = Date.now();
     
+    // Smoother frame rate optimization with linear interpolation
+    const frameRate = 30;
+    const frameTime = Math.floor(now / frameRate) * frameRate;
+    const nextFrameTime = frameTime + frameRate;
+    const interpolationFactor = (now - frameTime) / frameRate; // 0 to 1
+    
+    // Calculate breathing at current and next frame for smooth interpolation
+    const currentTime = frameTime * 0.001;
+    const nextTime = nextFrameTime * 0.001;
+    
     if (!isUserActive) {
-      // Create a subtle breathing effect with time-based scaling
-      const time = now * 0.001; // Convert to seconds
-      const breathingScale = 1 + 0.1 * Math.sin(time * 1.5); // Subtle breathing
+      // Smoother breathing effect with linear interpolation
+      const currentScale = 1 + 0.05 * Math.sin(currentTime * 0.4);
+      const nextScale = 1 + 0.05 * Math.sin(nextTime * 0.4);
+      const breathingScale = currentScale + (nextScale - currentScale) * interpolationFactor;
       nodeRadius = 6 * breathingScale;
     } else if (scaleTransitionStart && (now - scaleTransitionStart) < scaleTransitionDuration) {
-      // Smooth transition back to normal size
+      // Optimized transition with cached calculations
       const transitionProgress = Math.min((now - scaleTransitionStart) / scaleTransitionDuration, 1);
-      // Use the exact breathing scale at the moment transition started
-      const breathingScale = 1 + 0.1 * Math.sin((scaleTransitionStart * 0.001) * 1.5); // Last breathing scale
-      const targetScale = 1; // Normal scale
+      // Cache the breathing scale calculation with reduced frequency
+      const breathingScale = 1 + 0.05 * Math.sin((scaleTransitionStart * 0.001) * 0.4);
+      const targetScale = 1;
       const currentScale = breathingScale + (targetScale - breathingScale) * transitionProgress;
       nodeRadius = 6 * currentScale;
     }
@@ -1600,14 +1584,17 @@ return (
     
     // Add subtle color shift during breathing animation
     if (!isUserActive && fillColor === "white") {
-      const time = now * 0.001;
-      const colorShift = Math.sin(time * 1.5) * 0.1;
+      // Smoother color shift with linear interpolation
+      const currentColorShift = Math.sin(currentTime * 0.4) * 0.05;
+      const nextColorShift = Math.sin(nextTime * 0.4) * 0.05;
+      const colorShift = currentColorShift + (nextColorShift - currentColorShift) * interpolationFactor;
       // Shift towards a very light blue during breathing
       fillColor = `rgb(${255 + colorShift * 50}, ${255 + colorShift * 30}, ${255 + colorShift * 100})`;
     } else if (scaleTransitionStart && (now - scaleTransitionStart) < scaleTransitionDuration && fillColor === "white") {
-      // Smooth color transition back to normal
+      // Optimized color transition with cached calculations
       const transitionProgress = (now - scaleTransitionStart) / scaleTransitionDuration;
-      const lastColorShift = Math.sin((scaleTransitionStart * 0.001) * 1.5) * 0.1;
+      // Cache the color shift calculation with reduced frequency
+      const lastColorShift = Math.sin((scaleTransitionStart * 0.001) * 0.4) * 0.05;
       const currentColorShift = lastColorShift * (1 - transitionProgress);
       fillColor = `rgb(${255 + currentColorShift * 50}, ${255 + currentColorShift * 30}, ${255 + currentColorShift * 100})`;
     }
@@ -1617,10 +1604,11 @@ return (
       ctx.shadowColor = fillColor;
       ctx.shadowBlur = 3;
     } else if (scaleTransitionStart && (now - scaleTransitionStart) < scaleTransitionDuration) {
-      // Smooth glow transition back to normal
+      // Optimized glow transition
       const transitionProgress = (now - scaleTransitionStart) / scaleTransitionDuration;
       ctx.shadowColor = fillColor;
-      ctx.shadowBlur = 3 * (1 - transitionProgress);
+      // Use integer shadow blur for better performance
+      ctx.shadowBlur = Math.round(3 * (1 - transitionProgress));
     }
     
     ctx.fillStyle = fillColor;
