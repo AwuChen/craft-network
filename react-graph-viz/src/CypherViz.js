@@ -1565,17 +1565,17 @@ const NFCTrigger = ({ addNode }) => {
             console.log("Question was:", question);
             
             if (questionLower.includes('artist')) {
-              return `There are ${count} artists in the network.`;
+              return `There are ${count} artists.`;
             } else if (questionLower.includes('user')) {
-              return `There are ${count} users in the network.`;
+              return `There are ${count} users.`;
             } else if (questionLower.includes('connection') || questionLower.includes('relationship')) {
-              return `There are ${count} connections in the network.`;
+              return `There are ${count} connections.`;
             } else if (questionLower.includes('craftsman')) {
-              return `There are ${count} craftsmen in the network.`;
+              return `There are ${count} craftsmen.`;
             } else if (questionLower.includes('holder')) {
-              return `There are ${count} holders in the network.`;
+              return `There are ${count} holder.`;
             } else if (questionLower.includes('affiliate')) {
-              return `There are ${count} affiliates in the network.`;
+              return `There are ${count} affiliates.`;
             } else {
               return `The count is ${count}.`;
             }
@@ -1810,7 +1810,7 @@ return (
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            backgroundColor: "rgba(0, 0, 0, 0.3)",
             zIndex: 2000,
             display: "flex",
             justifyContent: "center",
@@ -1822,66 +1822,22 @@ return (
           }}
         >
           <div 
-            style={{
-              backgroundColor: "white",
-              border: "2px solid black",
-              borderRadius: "8px",
-              padding: "20px",
-              boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
-              maxWidth: "500px",
-              minWidth: "300px",
-              position: "absolute",
-              left: modalPosition.x,
-              top: modalPosition.y,
-              cursor: isDragging ? "grabbing" : "grab"
+            style={{ 
+              position: "absolute", 
+              top: "20%", 
+              left: "50%", 
+              transform: "translate(-50%, -50%)", 
+              padding: "20px", 
+              backgroundColor: "white", 
+              border: "1px solid black", 
+              boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.3)", 
+              zIndex: 2001
             }}
-            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside modal
-            onMouseDown={handleMouseDown}
+            onClick={(e) => e.stopPropagation()}
           >
-            <div 
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "15px",
-                borderBottom: "1px solid #ccc",
-                paddingBottom: "10px",
-                cursor: "grab"
-              }}
-              onMouseDown={handleMouseDown}
-            >
-              <div style={{ flex: 1 }}></div>
-              <h3 style={{ margin: 0, color: "black", textAlign: "center", flex: 2 }}>Network Analysis</h3>
-              <button 
-                onClick={() => {
-                  setShowAnalyticalModal(false);
-                  setAnalyticalAnswer(null);
-                }}
-                style={{
-                  background: "none",
-                  border: "none",
-                  fontSize: "20px",
-                  cursor: "pointer",
-                  color: "black",
-                  fontWeight: "bold",
-                  flex: 1
-                }}
-              >
-                ×
-              </button>
-            </div>
-            
-            <div style={{ marginBottom: "10px" }}>
-              <strong style={{ color: "black" }}>Question:</strong>
-              <p style={{ margin: "5px 0", fontStyle: "italic", color: "#666" }}>"{analyticalAnswer.question}"</p>
-            </div>
-            
-            <div>
-              <strong style={{ color: "black" }}>Answer:</strong>
-              <p style={{ margin: "5px 0", fontSize: "16px", lineHeight: "1.4", color: "black" }}>
-                {analyticalAnswer.answer}
-              </p>
-            </div>
+            <h3>Network Analysis</h3>
+            <p><strong>Question:</strong> "{analyticalAnswer.question}"</p>
+            <p><strong>Answer:</strong> {analyticalAnswer.answer}</p>
           </div>
         </div>
       )}
@@ -2012,7 +1968,7 @@ return (
   linkDirectionalArrowLength={5}
   />
 
-  {selectedNode && editedNode && (
+    {selectedNode && editedNode && (
     <div 
       style={{
         position: "fixed",
@@ -2020,7 +1976,7 @@ return (
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        backgroundColor: "rgba(0, 0, 0, 0.3)",
         zIndex: 1000,
         display: "flex",
         justifyContent: "center",
@@ -2029,188 +1985,80 @@ return (
       onClick={() => setSelectedNode(null)}
     >
       <div 
-        style={{
-          backgroundColor: "white",
-          border: "2px solid black",
-          borderRadius: "8px",
-          padding: "20px",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
-          maxWidth: "500px",
-          minWidth: "300px",
-          position: "absolute",
-          left: modalPosition.x,
-          top: modalPosition.y,
-          cursor: isDragging ? "grabbing" : "grab"
+        style={{ 
+          position: "absolute", 
+          top: "20%", 
+          left: "50%", 
+          transform: "translate(-50%, -50%)", 
+          padding: "20px", 
+          backgroundColor: "white", 
+          border: "1px solid black", 
+          boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.3)", 
+          zIndex: 1001
         }}
-        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside modal
-        onMouseDown={handleMouseDown}
+        onClick={(e) => e.stopPropagation()}
       >
-                    <div 
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "15px",
-                borderBottom: "1px solid #ccc",
-                paddingBottom: "10px",
-                cursor: "grab"
-              }}
-              onMouseDown={handleMouseDown}
-            >
-              <div style={{ flex: 1 }}></div>
-              <h3 style={{ margin: 0, color: "black", textAlign: "center", flex: 2 }}>
-                {selectedNode.name === latestNode ? "Edit Network Info" : "Network Info"}
-              </h3>
-              <button 
-                onClick={() => setSelectedNode(null)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  fontSize: "20px",
-                  cursor: "pointer",
-                  color: "black",
-                  fontWeight: "bold",
-                  flex: 1
-                }}
-              >
-                ×
-              </button>
-            </div>
-        
         {selectedNode.name === latestNode ? (
           <>
-            <div style={{ marginBottom: "10px" }}>
-              <strong style={{ color: "black" }}>Name:</strong>
-              <input 
-                name="name" 
-                value={editedNode.name} 
-                placeholder="Enter name" 
-                onChange={handleEditChange}
-                onFocus={(e) => e.target.placeholder = ""}
-                onBlur={(e) => e.target.placeholder = "Enter name"}
-                style={{
-                  width: "100%",
-                  padding: "8px",
-                  marginTop: "5px",
-                  border: "1px solid #ccc",
-                  borderRadius: "4px",
-                  fontSize: "14px"
-                }}
-              />
-            </div>
+          <h3>Edit Network Info</h3>
+          <p><strong>Name:</strong>
+          <input 
+          name="name" 
+          value={editedNode.name} 
+          placeholder="Enter name" 
+          onChange={handleEditChange}
+          onFocus={(e) => e.target.placeholder = ""}
+          onBlur={(e) => e.target.placeholder = "Enter name"} 
+          /></p>
 
-            <div style={{ marginBottom: "10px" }}>
-              <strong style={{ color: "black" }}>Role:</strong>
-              <input 
-                name="role" 
-                value={editedNode.role} 
-                placeholder="Enter role" 
-                onChange={handleEditChange}
-                onFocus={(e) => e.target.placeholder = ""}
-                onBlur={(e) => e.target.placeholder = "Enter role"}
-                style={{
-                  width: "100%",
-                  padding: "8px",
-                  marginTop: "5px",
-                  border: "1px solid #ccc",
-                  borderRadius: "4px",
-                  fontSize: "14px"
-                }}
-              />
-            </div>
+          <p><strong>Role:</strong>
+          <input 
+          name="role" 
+          value={editedNode.role} 
+          placeholder="Enter role" 
+          onChange={handleEditChange}
+          onFocus={(e) => e.target.placeholder = ""}
+          onBlur={(e) => e.target.placeholder = "Enter role"} 
+          /></p>
 
-            <div style={{ marginBottom: "10px" }}>
-              <strong style={{ color: "black" }}>Location:</strong>
-              <input 
-                name="location" 
-                value={editedNode.location} 
-                placeholder="Enter location" 
-                onChange={handleEditChange}
-                onFocus={(e) => e.target.placeholder = ""}
-                onBlur={(e) => e.target.placeholder = "Enter location"}
-                style={{
-                  width: "100%",
-                  padding: "8px",
-                  marginTop: "5px",
-                  border: "1px solid #ccc",
-                  borderRadius: "4px",
-                  fontSize: "14px"
-                }}
-              />
-            </div>
+          <p><strong>Location:</strong>
+          <input 
+          name="location" 
+          value={editedNode.location} 
+          placeholder="Enter location" 
+          onChange={handleEditChange}
+          onFocus={(e) => e.target.placeholder = ""}
+          onBlur={(e) => e.target.placeholder = "Enter location"} 
+          /></p>
 
-            <div style={{ marginBottom: "15px" }}>
-              <strong style={{ color: "black" }}>Website:</strong>
-              <input 
-                name="website" 
-                value={editedNode.website} 
-                placeholder="Enter website" 
-                onChange={handleEditChange}
-                onFocus={(e) => e.target.placeholder = ""}
-                onBlur={(e) => e.target.placeholder = "Enter website"}
-                style={{
-                  width: "100%",
-                  padding: "8px",
-                  marginTop: "5px",
-                  border: "1px solid #ccc",
-                  borderRadius: "4px",
-                  fontSize: "14px"
-                }}
-              />
-            </div>
+          <p><strong>Website:</strong>
+          <input 
+          name="website" 
+          value={editedNode.website} 
+          placeholder="Enter website" 
+          onChange={handleEditChange}
+          onFocus={(e) => e.target.placeholder = ""}
+          onBlur={(e) => e.target.placeholder = "Enter website"} 
+          /></p>
 
-            <button 
-              onClick={saveNodeChanges}
-              style={{
-                backgroundColor: "black",
-                color: "white",
-                border: "none",
-                padding: "10px 20px",
-                borderRadius: "4px",
-                cursor: "pointer",
-                fontSize: "14px",
-                fontWeight: "bold"
-              }}
-            >
-              Save
-            </button>
+          <p><button onClick={saveNodeChanges}>Save</button></p>
           </>
-        ) : (
+          ) : (
           <>
-            <div style={{ marginBottom: "10px" }}>
-              <strong style={{ color: "black" }}>Name:</strong>
-              <p style={{ margin: "5px 0", color: "black" }}>{selectedNode?.name}</p>
-            </div>
-
-            <div style={{ marginBottom: "10px" }}>
-              <strong style={{ color: "black" }}>Role:</strong>
-              <p style={{ margin: "5px 0", color: "black" }}>{selectedNode?.role}</p>
-            </div>
-
-            <div style={{ marginBottom: "10px" }}>
-              <strong style={{ color: "black" }}>Location:</strong>
-              <p style={{ margin: "5px 0", color: "black" }}>{selectedNode?.location}</p>
-            </div>
-
-            <div style={{ marginBottom: "10px" }}>
-              <strong style={{ color: "black" }}>Website:</strong>
-              <p style={{ margin: "5px 0", color: "black" }}>
-                {selectedNode.website && selectedNode.website !== "" ? (
-                  <a 
-                    href={selectedNode.website} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    style={{ color: "#0066cc", textDecoration: "none" }}
-                  >
-                    {selectedNode.website.length > 30 
-                      ? `${selectedNode.website.substring(0, 30)}...`
-                      : selectedNode.website}
-                  </a>
-                ) : (
-                  "No website"
-                )}
-              </p>
-            </div>
+          <h3>Network Info</h3>
+          <p><strong>Name:</strong> {selectedNode?.name}</p>
+          <p><strong>Role:</strong> {selectedNode?.role}</p>
+          <p><strong>Location:</strong> {selectedNode?.location}</p>
+          <p><strong>Website:</strong>{" "}
+          {selectedNode.website && selectedNode.website !== "" ? (
+            <a href={selectedNode.website} target="_blank" rel="noopener noreferrer">
+            {selectedNode.website.length > 30 
+              ? `${selectedNode.website.substring(0, 30)}...`
+            : selectedNode.website}
+            </a>
+            ) : (
+            ""
+          )}</p>
           </>
         )}
       </div>
