@@ -1052,6 +1052,14 @@ const NFCTrigger = ({ addNode }) => {
         const [mutatedNodes, setMutatedNodes] = useState([]); // Track nodes created/modified by mutation queries
         const [analyticalAnswer, setAnalyticalAnswer] = useState(null); // For displaying analytical answers
         const [showAnalyticalModal, setShowAnalyticalModal] = useState(false); // For showing/hiding the answer modal
+        const [modalPosition, setModalPosition] = useState(() => {
+          // Calculate center position for initial modal placement
+          const centerX = Math.max(0, (window.innerWidth - 500) / 2);
+          const centerY = Math.max(0, (window.innerHeight - 300) / 2);
+          return { x: centerX, y: centerY };
+        }); // For dragging modals
+        const [isDragging, setIsDragging] = useState(false); // Track if modal is being dragged
+        const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 }); // Track mouse offset during drag
 
         // Detect when latestNode changes (NFC addition) and set lastAction
         useEffect(() => {
@@ -1461,6 +1469,12 @@ const NFCTrigger = ({ addNode }) => {
 
         const handleNodeClick = (node) => {
           if (!node) return;
+          
+          // Reset modal position to center
+          const centerX = Math.max(0, (window.innerWidth - 500) / 2);
+          const centerY = Math.max(0, (window.innerHeight - 300) / 2);
+          setModalPosition({ x: centerX, y: centerY });
+          
           setSelectedNode(node);
           setEditedNode({ ...node });
           setFocusNode(node.name);
@@ -1681,6 +1695,11 @@ const NFCTrigger = ({ addNode }) => {
 
         // Helper function to display analytical answers
         const displayAnalyticalAnswer = (answer, question) => {
+          // Reset modal position to center
+          const centerX = Math.max(0, (window.innerWidth - 500) / 2);
+          const centerY = Math.max(0, (window.innerHeight - 300) / 2);
+          setModalPosition({ x: centerX, y: centerY });
+          
           setAnalyticalAnswer({ answer, question });
           setShowAnalyticalModal(true);
           
@@ -1690,6 +1709,49 @@ const NFCTrigger = ({ addNode }) => {
             setAnalyticalAnswer(null);
           }, 8000);
         };
+
+        // Drag event handlers for modals
+        const handleMouseDown = (e) => {
+          setIsDragging(true);
+          const rect = e.currentTarget.getBoundingClientRect();
+          setDragOffset({
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top
+          });
+        };
+
+        const handleMouseMove = (e) => {
+          if (isDragging) {
+            const newX = e.clientX - dragOffset.x;
+            const newY = e.clientY - dragOffset.y;
+            
+            // Keep modal within viewport bounds
+            const maxX = window.innerWidth - 500; // modal width
+            const maxY = window.innerHeight - 300; // approximate modal height
+            
+            setModalPosition({
+              x: Math.max(0, Math.min(newX, maxX)),
+              y: Math.max(0, Math.min(newY, maxY))
+            });
+          }
+        };
+
+        const handleMouseUp = () => {
+          setIsDragging(false);
+        };
+
+        // Add global mouse event listeners for dragging
+        useEffect(() => {
+          if (isDragging) {
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+            
+            return () => {
+              document.removeEventListener('mousemove', handleMouseMove);
+              document.removeEventListener('mouseup', handleMouseUp);
+            };
+          }
+        }, [isDragging, dragOffset]);
 
 
 return (
@@ -1741,56 +1803,85 @@ return (
 
       {/* Analytical Answer Modal */}
       {showAnalyticalModal && analyticalAnswer && (
-        <div style={{
-          position: "fixed",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          backgroundColor: "white",
-          border: "2px solid #4CAF50",
-          borderRadius: "8px",
-          padding: "20px",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
-          zIndex: 2000,
-          maxWidth: "500px",
-          minWidth: "300px"
-        }}>
-          <div style={{
+        <div 
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            zIndex: 2000,
             display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "15px",
-            borderBottom: "1px solid #eee",
-            paddingBottom: "10px"
-          }}>
-            <h3 style={{ margin: 0, color: "#4CAF50" }}>Network Analysis</h3>
-            <button 
-              onClick={() => {
-                setShowAnalyticalModal(false);
-                setAnalyticalAnswer(null);
-              }}
+            justifyContent: "center",
+            alignItems: "center"
+          }}
+          onClick={() => {
+            setShowAnalyticalModal(false);
+            setAnalyticalAnswer(null);
+          }}
+        >
+          <div 
+            style={{
+              backgroundColor: "white",
+              border: "2px solid black",
+              borderRadius: "8px",
+              padding: "20px",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+              maxWidth: "500px",
+              minWidth: "300px",
+              position: "absolute",
+              left: modalPosition.x,
+              top: modalPosition.y,
+              cursor: isDragging ? "grabbing" : "grab"
+            }}
+            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside modal
+            onMouseDown={handleMouseDown}
+          >
+            <div 
               style={{
-                background: "none",
-                border: "none",
-                fontSize: "20px",
-                cursor: "pointer",
-                color: "#666"
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "15px",
+                borderBottom: "1px solid #ccc",
+                paddingBottom: "10px",
+                cursor: "grab"
               }}
+              onMouseDown={handleMouseDown}
             >
-              ×
-            </button>
-          </div>
-          
-          <div style={{ marginBottom: "10px" }}>
-            <strong style={{ color: "#666" }}>Question:</strong>
-            <p style={{ margin: "5px 0", fontStyle: "italic" }}>"{analyticalAnswer.question}"</p>
-          </div>
-          
-          <div>
-            <strong style={{ color: "#4CAF50" }}>Answer:</strong>
-            <p style={{ margin: "5px 0", fontSize: "16px", lineHeight: "1.4" }}>
-              {analyticalAnswer.answer}
-            </p>
+              <div style={{ flex: 1 }}></div>
+              <h3 style={{ margin: 0, color: "black", textAlign: "center", flex: 2 }}>Network Analysis</h3>
+              <button 
+                onClick={() => {
+                  setShowAnalyticalModal(false);
+                  setAnalyticalAnswer(null);
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: "20px",
+                  cursor: "pointer",
+                  color: "black",
+                  fontWeight: "bold",
+                  flex: 1
+                }}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div style={{ marginBottom: "10px" }}>
+              <strong style={{ color: "black" }}>Question:</strong>
+              <p style={{ margin: "5px 0", fontStyle: "italic", color: "#666" }}>"{analyticalAnswer.question}"</p>
+            </div>
+            
+            <div>
+              <strong style={{ color: "black" }}>Answer:</strong>
+              <p style={{ margin: "5px 0", fontSize: "16px", lineHeight: "1.4", color: "black" }}>
+                {analyticalAnswer.answer}
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -1922,71 +2013,207 @@ return (
   />
 
   {selectedNode && editedNode && (
-    <div style={{ position: "absolute", top: "20%", left: "50%", transform: "translate(-50%, -50%)", padding: "20px", backgroundColor: "white", border: "1px solid black", boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.3)", zIndex: 1000 }}>
-    {selectedNode.name === latestNode ? (
-      <>
-      <h3>Edit Network Info</h3>
-      <p><strong>Name:</strong>
-      <input 
-      name="name" 
-      value={editedNode.name} 
-      placeholder="Enter name" 
-      onChange={handleEditChange}
-      onFocus={(e) => e.target.placeholder = ""}
-      onBlur={(e) => e.target.placeholder = "Enter name"} 
-      /></p>
+    <div 
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        zIndex: 1000,
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center"
+      }}
+      onClick={() => setSelectedNode(null)}
+    >
+      <div 
+        style={{
+          backgroundColor: "white",
+          border: "2px solid black",
+          borderRadius: "8px",
+          padding: "20px",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+          maxWidth: "500px",
+          minWidth: "300px",
+          position: "absolute",
+          left: modalPosition.x,
+          top: modalPosition.y,
+          cursor: isDragging ? "grabbing" : "grab"
+        }}
+        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside modal
+        onMouseDown={handleMouseDown}
+      >
+                    <div 
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "15px",
+                borderBottom: "1px solid #ccc",
+                paddingBottom: "10px",
+                cursor: "grab"
+              }}
+              onMouseDown={handleMouseDown}
+            >
+              <div style={{ flex: 1 }}></div>
+              <h3 style={{ margin: 0, color: "black", textAlign: "center", flex: 2 }}>
+                {selectedNode.name === latestNode ? "Edit Network Info" : "Network Info"}
+              </h3>
+              <button 
+                onClick={() => setSelectedNode(null)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: "20px",
+                  cursor: "pointer",
+                  color: "black",
+                  fontWeight: "bold",
+                  flex: 1
+                }}
+              >
+                ×
+              </button>
+            </div>
+        
+        {selectedNode.name === latestNode ? (
+          <>
+            <div style={{ marginBottom: "10px" }}>
+              <strong style={{ color: "black" }}>Name:</strong>
+              <input 
+                name="name" 
+                value={editedNode.name} 
+                placeholder="Enter name" 
+                onChange={handleEditChange}
+                onFocus={(e) => e.target.placeholder = ""}
+                onBlur={(e) => e.target.placeholder = "Enter name"}
+                style={{
+                  width: "100%",
+                  padding: "8px",
+                  marginTop: "5px",
+                  border: "1px solid #ccc",
+                  borderRadius: "4px",
+                  fontSize: "14px"
+                }}
+              />
+            </div>
 
-      <p><strong>Role:</strong>
-      <input 
-      name="role" 
-      value={editedNode.role} 
-      placeholder="Enter role" 
-      onChange={handleEditChange}
-      onFocus={(e) => e.target.placeholder = ""}
-      onBlur={(e) => e.target.placeholder = "Enter role"} 
-      /></p>
+            <div style={{ marginBottom: "10px" }}>
+              <strong style={{ color: "black" }}>Role:</strong>
+              <input 
+                name="role" 
+                value={editedNode.role} 
+                placeholder="Enter role" 
+                onChange={handleEditChange}
+                onFocus={(e) => e.target.placeholder = ""}
+                onBlur={(e) => e.target.placeholder = "Enter role"}
+                style={{
+                  width: "100%",
+                  padding: "8px",
+                  marginTop: "5px",
+                  border: "1px solid #ccc",
+                  borderRadius: "4px",
+                  fontSize: "14px"
+                }}
+              />
+            </div>
 
-      <p><strong>Location:</strong>
-      <input 
-      name="location" 
-      value={editedNode.location} 
-      placeholder="Enter location" 
-      onChange={handleEditChange}
-      onFocus={(e) => e.target.placeholder = ""}
-      onBlur={(e) => e.target.placeholder = "Enter location"} 
-      /></p>
+            <div style={{ marginBottom: "10px" }}>
+              <strong style={{ color: "black" }}>Location:</strong>
+              <input 
+                name="location" 
+                value={editedNode.location} 
+                placeholder="Enter location" 
+                onChange={handleEditChange}
+                onFocus={(e) => e.target.placeholder = ""}
+                onBlur={(e) => e.target.placeholder = "Enter location"}
+                style={{
+                  width: "100%",
+                  padding: "8px",
+                  marginTop: "5px",
+                  border: "1px solid #ccc",
+                  borderRadius: "4px",
+                  fontSize: "14px"
+                }}
+              />
+            </div>
 
-      <p><strong>Website:</strong>
-      <input 
-      name="website" 
-      value={editedNode.website} 
-      placeholder="Enter website" 
-      onChange={handleEditChange}
-      onFocus={(e) => e.target.placeholder = ""}
-      onBlur={(e) => e.target.placeholder = "Enter website"} 
-      /></p>
+            <div style={{ marginBottom: "15px" }}>
+              <strong style={{ color: "black" }}>Website:</strong>
+              <input 
+                name="website" 
+                value={editedNode.website} 
+                placeholder="Enter website" 
+                onChange={handleEditChange}
+                onFocus={(e) => e.target.placeholder = ""}
+                onBlur={(e) => e.target.placeholder = "Enter website"}
+                style={{
+                  width: "100%",
+                  padding: "8px",
+                  marginTop: "5px",
+                  border: "1px solid #ccc",
+                  borderRadius: "4px",
+                  fontSize: "14px"
+                }}
+              />
+            </div>
 
-      <p><button onClick={saveNodeChanges}>Save</button></p>
-      </>
-      ) : (
-      <>
-      <h3>Network Info</h3>
-      <p><strong>Name:</strong> {selectedNode?.name}</p>
-      <p><strong>Role:</strong> {selectedNode?.role}</p>
-      <p><strong>Location:</strong> {selectedNode?.location}</p>
-      <p><strong>Website:</strong>{" "}
-      {selectedNode.website && selectedNode.website !== "" ? (
-        <a href={selectedNode.website} target="_blank" rel="noopener noreferrer">
-        {selectedNode.website.length > 30 
-          ? `${selectedNode.website.substring(0, 30)}...`
-        : selectedNode.website}
-        </a>
+            <button 
+              onClick={saveNodeChanges}
+              style={{
+                backgroundColor: "black",
+                color: "white",
+                border: "none",
+                padding: "10px 20px",
+                borderRadius: "4px",
+                cursor: "pointer",
+                fontSize: "14px",
+                fontWeight: "bold"
+              }}
+            >
+              Save
+            </button>
+          </>
         ) : (
-        ""
-      )}</p>
-      </>
-    )}
-    <button onClick={() => setSelectedNode(null)}>Close</button>
+          <>
+            <div style={{ marginBottom: "10px" }}>
+              <strong style={{ color: "black" }}>Name:</strong>
+              <p style={{ margin: "5px 0", color: "black" }}>{selectedNode?.name}</p>
+            </div>
+
+            <div style={{ marginBottom: "10px" }}>
+              <strong style={{ color: "black" }}>Role:</strong>
+              <p style={{ margin: "5px 0", color: "black" }}>{selectedNode?.role}</p>
+            </div>
+
+            <div style={{ marginBottom: "10px" }}>
+              <strong style={{ color: "black" }}>Location:</strong>
+              <p style={{ margin: "5px 0", color: "black" }}>{selectedNode?.location}</p>
+            </div>
+
+            <div style={{ marginBottom: "10px" }}>
+              <strong style={{ color: "black" }}>Website:</strong>
+              <p style={{ margin: "5px 0", color: "black" }}>
+                {selectedNode.website && selectedNode.website !== "" ? (
+                  <a 
+                    href={selectedNode.website} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    style={{ color: "#0066cc", textDecoration: "none" }}
+                  >
+                    {selectedNode.website.length > 30 
+                      ? `${selectedNode.website.substring(0, 30)}...`
+                      : selectedNode.website}
+                  </a>
+                ) : (
+                  "No website"
+                )}
+              </p>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )}
   </div>
