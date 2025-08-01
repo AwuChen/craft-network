@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter as Router, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import './App.css';
 import ForceGraph2D from 'react-force-graph-2d';
@@ -1060,6 +1060,9 @@ const NFCTrigger = ({ addNode }) => {
         }); // For dragging modals
         const [isDragging, setIsDragging] = useState(false); // Track if modal is being dragged
         const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 }); // Track mouse offset during drag
+        const [userHasZoomed, setUserHasZoomed] = useState(false); // Track if user has manually zoomed
+        const [lastUserZoomTime, setLastUserZoomTime] = useState(0); // Track when user last zoomed
+        const lastUserZoomRef = useRef(0); // Ref to track last user zoom time for immediate access
 
         // Detect when latestNode changes (NFC addition) and set lastAction
         useEffect(() => {
@@ -1178,6 +1181,17 @@ const NFCTrigger = ({ addNode }) => {
         
         // Auto-zoom to visible nodes
         useEffect(() => {
+          // Don't auto-zoom if user has recently zoomed manually
+          if (userHasZoomed) {
+            return;
+          }
+          
+          // Additional protection: don't auto-zoom if user zoomed within the last 2 seconds
+          const timeSinceLastUserZoom = Date.now() - lastUserZoomRef.current;
+          if (timeSinceLastUserZoom < 2000) {
+            return;
+          }
+          
           // Only auto-zoom if there's a search term or if a node was clicked (not just hovered)
           // Don't auto-zoom for latestNode unless there's no other focus
           if (fgRef.current && zoomNodes.size > 0) {
@@ -1302,7 +1316,7 @@ const NFCTrigger = ({ addNode }) => {
               }, 1000); // 1 second delay for mutation
             }
           }
-        }, [zoomNodes, data.nodes, fgRef, lastAction, clickedNode, latestNode, inputValue, mutatedNodes]);
+        }, [zoomNodes, data.nodes, fgRef, lastAction, clickedNode, latestNode, inputValue, mutatedNodes, userHasZoomed]);
 
         const handleInputChange = (event) => {
           const input = event.target.value;
@@ -1312,11 +1326,13 @@ const NFCTrigger = ({ addNode }) => {
           // Update user activity when typing
           updateUserActivity();
           
-          // Clear other actions when searching
-          if (input.trim()) {
-            setClickedNode(null);
-            setLastAction('search');
-          }
+                      // Clear other actions when searching
+            if (input.trim()) {
+              setClickedNode(null);
+              setLastAction('search');
+              // Reset user zoom flag to allow auto-zoom for search results
+              setUserHasZoomed(false);
+            }
         };
 
         const handleSubmit = async (e) => {
@@ -1480,6 +1496,9 @@ const NFCTrigger = ({ addNode }) => {
           setFocusNode(node.name);
           setClickedNode(node.name);
           setLastAction('click');
+          
+          // Reset user zoom flag to allow auto-zoom for new actions
+          setUserHasZoomed(false);
           
           // Update user activity when clicking nodes
           updateUserActivity();
@@ -1753,6 +1772,19 @@ const NFCTrigger = ({ addNode }) => {
           }
         }, [isDragging, dragOffset]);
 
+        // Track user zoom actions
+        const handleUserZoom = () => {
+          const now = Date.now();
+          setUserHasZoomed(true);
+          setLastUserZoomTime(now);
+          lastUserZoomRef.current = now;
+          
+          // Reset user zoom flag after 8 seconds of inactivity (increased delay)
+          setTimeout(() => {
+            setUserHasZoomed(false);
+          }, 8000);
+        };
+
 
 return (
     <div width="95%">
@@ -1876,6 +1908,8 @@ return (
     setLastAction(null);
     setMutatedNodes([]);
   }}
+  onZoom={handleUserZoom}
+  onZoomEnd={handleUserZoom}
   nodeCanvasObject={(node, ctx) => {
     const isHighlighted =
       inputValue &&
