@@ -1050,6 +1050,8 @@ const NFCTrigger = ({ addNode }) => {
         const [clickedNode, setClickedNode] = useState(null);
         const [lastAction, setLastAction] = useState(null); // 'search', 'click', 'latestNode', or 'mutation'
         const [mutatedNodes, setMutatedNodes] = useState([]); // Track nodes created/modified by mutation queries
+        const [analyticalAnswer, setAnalyticalAnswer] = useState(null); // For displaying analytical answers
+        const [showAnalyticalModal, setShowAnalyticalModal] = useState(false); // For showing/hiding the answer modal
 
         // Detect when latestNode changes (NFC addition) and set lastAction
         useEffect(() => {
@@ -1322,62 +1324,135 @@ const NFCTrigger = ({ addNode }) => {
             const data = await response.json();
             const generatedQuery = data.text || data.query || "";
 
-            setInputValue(generatedQuery);
-            handleChange({ target: { value: generatedQuery } });
-
-            await loadData(null, generatedQuery);
-
-            // Check if the generated query is a mutation query (updates the graph)
-            const isMutationQuery = /(CREATE|MERGE|SET|DELETE|REMOVE|DETACH DELETE)/i.test(generatedQuery.trim());
-            
-            // If it's a mutation query, immediately return to default state
-            if (isMutationQuery) {
+            // More specific detection for true analytical questions vs visualization requests
+            const isTrueAnalyticalQuestion = (() => {
+              const question = inputValue.toLowerCase();
+              const analyticalKeywords = ['how many', 'how much', 'what is', 'what are', 'when', 'where', 'why', 'who', 'which', 'how', 'what'];
               
-              // Extract node names from the mutation query to track what was created/modified
-              let extractedNodes = [];
+              // True analytical questions that ask for specific data points
+              const analyticalPatterns = [
+                /how many/i,
+                /how much/i,
+                /what is the (count|number|total)/i,
+                /what are the (count|numbers|totals)/i,
+                /count of/i,
+                /total number of/i,
+                /how many (artists|users|people|connections|relationships)/i,
+                /what (roles|locations|websites) (exist|are there)/i,
+                /which (roles|locations|websites)/i,
+                /what is the most common/i,
+                /what is the average/i,
+                /how many people are (in|from)/i
+              ];
               
-              // Handle different mutation query patterns
-              if (generatedQuery.includes('DELETE')) {
-                // For DELETE queries, extract from patterns like DELETE (u:User {name: "John"}) or MATCH (u:User {name: "John"}) DELETE u
-                const deleteMatches = generatedQuery.match(/\{name:\s*['"]([^'"]+)['"]\}/g);
-                if (deleteMatches) {
-                  extractedNodes = deleteMatches.map(match => {
-                    const nameMatch = match.match(/name:\s*['"]([^'"]+)['"]/);
-                    return nameMatch ? nameMatch[1] : null;
-                  }).filter(Boolean);
-                }
-              } else if (generatedQuery.includes('SET')) {
-                // For SET queries, extract from MATCH clause like MATCH (u:User {name: "John"}) SET u.role = 'admin'
-                const matchClause = generatedQuery.match(/MATCH\s*\([^)]*\{name:\s*['"]([^'"]+)['"][^}]*\}\)/i);
-                if (matchClause) {
-                  extractedNodes = [matchClause[1]];
-                }
-              } else {
-                // For CREATE/MERGE queries, extract from {name: "nodeName"} patterns
-                const nodeMatches = generatedQuery.match(/\{([^}]+)\}/g);
-                extractedNodes = nodeMatches ? 
-                  nodeMatches.map(match => {
-                    const nameMatch = match.match(/name:\s*['"]([^'"]+)['"]/);
-                    return nameMatch ? nameMatch[1] : null;
-                  }).filter(Boolean) : [];
+              // Visualization requests that should NOT be treated as analytical
+              const visualizationPatterns = [
+                /show me/i,
+                /display/i,
+                /visualize/i,
+                /find/i,
+                /search for/i,
+                /look for/i,
+                /get/i,
+                /bring up/i,
+                /open/i
+              ];
+              
+              // If it matches visualization patterns, it's NOT analytical
+              if (visualizationPatterns.some(pattern => pattern.test(question))) {
+                return false;
               }
               
-              setMutatedNodes(extractedNodes);
-              setLastAction('mutation');
+              // If it matches analytical patterns, it IS analytical
+              if (analyticalPatterns.some(pattern => pattern.test(question))) {
+                return true;
+              }
               
-              // Immediately return to default query without any delay
-              const defaultQuery = `
-                MATCH (u:User)-[r:CONNECTED_TO]->(v:User)
-                RETURN u.name AS source, u.role AS sourceRole, u.location AS sourceLocation, u.website AS sourceWebsite, 
-                       v.name AS target, v.role AS targetRole, v.location AS targetLocation, v.website AS targetWebsite
-              `;
-              await loadData(null, defaultQuery);
+              // Default: if it contains analytical keywords but doesn't match visualization patterns
+              return analyticalKeywords.some(keyword => question.includes(keyword));
+            })();
+
+            if (isTrueAnalyticalQuestion) {
+              // For analytical questions, execute the query and provide a text answer
+              try {
+                const session = driver.session({ database: "neo4j" });
+                const result = await session.run(generatedQuery);
+                await session.close();
+
+                // Generate a human-readable answer based on the query results
+                const answer = generateAnalyticalAnswer(inputValue, result, generatedQuery);
+                
+                // Display the answer in a modal or notification
+                displayAnalyticalAnswer(answer, inputValue);
+                
+                // Clear the input after showing the answer
+                setTimeout(() => {
+                  setInputValue("");
+                }, 5000); // Keep answer visible longer for analytical questions
+                
+              } catch (queryError) {
+                console.error("Error executing analytical query:", queryError);
+                displayAnalyticalAnswer("Sorry, I couldn't analyze that question. Please try rephrasing it.", inputValue);
+              }
+            } else {
+              // For regular queries, proceed with the existing logic
+              setInputValue(generatedQuery);
+              handleChange({ target: { value: generatedQuery } });
+
+              await loadData(null, generatedQuery);
+
+              // Check if the generated query is a mutation query (updates the graph)
+              const isMutationQuery = /(CREATE|MERGE|SET|DELETE|REMOVE|DETACH DELETE)/i.test(generatedQuery.trim());
+              
+              // If it's a mutation query, immediately return to default state
+              if (isMutationQuery) {
+                
+                // Extract node names from the mutation query to track what was created/modified
+                let extractedNodes = [];
+                
+                // Handle different mutation query patterns
+                if (generatedQuery.includes('DELETE')) {
+                  // For DELETE queries, extract from patterns like DELETE (u:User {name: "John"}) or MATCH (u:User {name: "John"}) DELETE u
+                  const deleteMatches = generatedQuery.match(/\{name:\s*['"]([^'"]+)['"]\}/g);
+                  if (deleteMatches) {
+                    extractedNodes = deleteMatches.map(match => {
+                      const nameMatch = match.match(/name:\s*['"]([^'"]+)['"]/);
+                      return nameMatch ? nameMatch[1] : null;
+                    }).filter(Boolean);
+                  }
+                } else if (generatedQuery.includes('SET')) {
+                  // For SET queries, extract from MATCH clause like MATCH (u:User {name: "John"}) SET u.role = 'admin'
+                  const matchClause = generatedQuery.match(/MATCH\s*\([^)]*\{name:\s*['"]([^'"]+)['"][^}]*\}\)/i);
+                  if (matchClause) {
+                    extractedNodes = [matchClause[1]];
+                  }
+                } else {
+                  // For CREATE/MERGE queries, extract from {name: "nodeName"} patterns
+                  const nodeMatches = generatedQuery.match(/\{([^}]+)\}/g);
+                  extractedNodes = nodeMatches ? 
+                    nodeMatches.map(match => {
+                      const nameMatch = match.match(/name:\s*['"]([^'"]+)['"]/);
+                      return nameMatch ? nameMatch[1] : null;
+                    }).filter(Boolean) : [];
+                }
+                
+                setMutatedNodes(extractedNodes);
+                setLastAction('mutation');
+                
+                // Immediately return to default query without any delay
+                const defaultQuery = `
+                  MATCH (u:User)-[r:CONNECTED_TO]->(v:User)
+                  RETURN u.name AS source, u.role AS sourceRole, u.location AS sourceLocation, u.website AS sourceWebsite, 
+                         v.name AS target, v.role AS targetRole, v.location AS targetLocation, v.website AS targetWebsite
+                `;
+                await loadData(null, defaultQuery);
+              }
+              
+              // Clear the input after 3 seconds
+              setTimeout(() => {
+                setInputValue("");
+              }, 3000);
             }
-            
-            // Clear the input after 3 seconds
-            setTimeout(() => {
-              setInputValue("");
-            }, 3000);
             
             } catch (error) {
               console.error("Flowise call failed:", error);
@@ -1452,6 +1527,170 @@ const NFCTrigger = ({ addNode }) => {
           }
         };
 
+        // Helper function to generate human-readable answers from query results
+        const generateAnalyticalAnswer = (question, result, query) => {
+          const questionLower = question.toLowerCase();
+          const records = result.records;
+          
+          // Debug logging to see what's happening
+          console.log("Analytical question:", question);
+          console.log("Generated query:", query);
+          console.log("Query result:", result);
+          console.log("Records:", records);
+          
+          if (records.length === 0) {
+            return "I couldn't find any data matching your question.";
+          }
+
+          // Handle count queries
+          if (questionLower.includes('how many') || questionLower.includes('count')) {
+            const count = records[0].get(0);
+            
+            // Debug: Log the actual query and result for count queries
+            console.log("Count query result:", count);
+            console.log("Question was:", question);
+            
+            if (questionLower.includes('artist')) {
+              return `There are ${count} artists in the network.`;
+            } else if (questionLower.includes('user')) {
+              return `There are ${count} users in the network.`;
+            } else if (questionLower.includes('connection') || questionLower.includes('relationship')) {
+              return `There are ${count} connections in the network.`;
+            } else if (questionLower.includes('craftsman')) {
+              return `There are ${count} craftsmen in the network.`;
+            } else if (questionLower.includes('holder')) {
+              return `There are ${count} holders in the network.`;
+            } else if (questionLower.includes('affiliate')) {
+              return `There are ${count} affiliates in the network.`;
+            } else {
+              return `The count is ${count}.`;
+            }
+          }
+
+          // Handle location-based queries
+          if (questionLower.includes('where') || questionLower.includes('location')) {
+            let locations = [];
+            
+            // Try different case variations for location field
+            if (records[0].keys && records[0].keys.includes('location')) {
+              locations = records.map(record => record.get('location')).filter(Boolean);
+            } else if (records[0].keys && records[0].keys.includes('Location')) {
+              locations = records.map(record => record.get('Location')).filter(Boolean);
+            } else if (records[0].keys && records[0].keys.includes('u_location')) {
+              locations = records.map(record => record.get('u_location')).filter(Boolean);
+            } else if (records[0].keys && records[0].keys.includes('u_Location')) {
+              locations = records.map(record => record.get('u_Location')).filter(Boolean);
+            } else {
+              locations = records.map(record => record.get(0)).filter(Boolean);
+            }
+            
+            const uniqueLocations = [...new Set(locations)];
+            if (uniqueLocations.length === 1) {
+              return `The location is ${uniqueLocations[0]}.`;
+            } else {
+              return `The locations found are: ${uniqueLocations.join(', ')}.`;
+            }
+          }
+
+          // Handle role-based queries
+          if (questionLower.includes('role') || questionLower.includes('what do')) {
+            let roles = [];
+            
+            // Try different case variations for role field
+            if (records[0].keys && records[0].keys.includes('role')) {
+              roles = records.map(record => record.get('role')).filter(Boolean);
+            } else if (records[0].keys && records[0].keys.includes('Role')) {
+              roles = records.map(record => record.get('Role')).filter(Boolean);
+            } else if (records[0].keys && records[0].keys.includes('u_role')) {
+              roles = records.map(record => record.get('u_role')).filter(Boolean);
+            } else if (records[0].keys && records[0].keys.includes('u_Role')) {
+              roles = records.map(record => record.get('u_Role')).filter(Boolean);
+            } else {
+              roles = records.map(record => record.get(0)).filter(Boolean);
+            }
+            
+            const uniqueRoles = [...new Set(roles)];
+            if (uniqueRoles.length === 1) {
+              return `The role is ${uniqueRoles[0]}.`;
+            } else {
+              return `The roles found are: ${uniqueRoles.join(', ')}.`;
+            }
+          }
+
+          // Handle name-based queries
+          if (questionLower.includes('who') || questionLower.includes('name')) {
+            let names = [];
+            
+            // Try different case variations for name field
+            if (records[0].keys && records[0].keys.includes('name')) {
+              names = records.map(record => record.get('name')).filter(Boolean);
+            } else if (records[0].keys && records[0].keys.includes('Name')) {
+              names = records.map(record => record.get('Name')).filter(Boolean);
+            } else if (records[0].keys && records[0].keys.includes('u_name')) {
+              names = records.map(record => record.get('u_name')).filter(Boolean);
+            } else if (records[0].keys && records[0].keys.includes('u_Name')) {
+              names = records.map(record => record.get('u_Name')).filter(Boolean);
+            } else {
+              names = records.map(record => record.get(0)).filter(Boolean);
+            }
+            
+            if (names.length === 1) {
+              return `The person is ${names[0]}.`;
+            } else if (names.length <= 5) {
+              return `The people are: ${names.join(', ')}.`;
+            } else {
+              return `Found ${names.length} people: ${names.slice(0, 3).join(', ')} and ${names.length - 3} more.`;
+            }
+          }
+
+          // Handle "what roles exist" specifically
+          if (questionLower.includes('what roles exist') || questionLower.includes('what roles are there')) {
+            // Try to extract roles from different possible result formats
+            let roles = [];
+            
+            // Check if the query returned role data - try different case variations
+            if (records[0].keys && records[0].keys.includes('role')) {
+              roles = records.map(record => record.get('role')).filter(Boolean);
+            } else if (records[0].keys && records[0].keys.includes('Role')) {
+              roles = records.map(record => record.get('Role')).filter(Boolean);
+            } else if (records[0].keys && records[0].keys.includes('u_role')) {
+              roles = records.map(record => record.get('u_role')).filter(Boolean);
+            } else if (records[0].keys && records[0].keys.includes('u_Role')) {
+              roles = records.map(record => record.get('u_Role')).filter(Boolean);
+            } else {
+              // Try to get the first column as roles
+              roles = records.map(record => record.get(0)).filter(Boolean);
+            }
+            
+            const uniqueRoles = [...new Set(roles)];
+            if (uniqueRoles.length > 0) {
+              return `The roles found in the network are: ${uniqueRoles.join(', ')}.`;
+            } else {
+              return "I couldn't find any role information in the network.";
+            }
+          }
+
+          // Default response for other queries
+          const resultCount = records.length;
+          if (resultCount === 1) {
+            return "I found 1 result matching your question.";
+          } else {
+            return `I found ${resultCount} results matching your question.`;
+          }
+        };
+
+        // Helper function to display analytical answers
+        const displayAnalyticalAnswer = (answer, question) => {
+          setAnalyticalAnswer({ answer, question });
+          setShowAnalyticalModal(true);
+          
+          // Auto-hide after 8 seconds
+          setTimeout(() => {
+            setShowAnalyticalModal(false);
+            setAnalyticalAnswer(null);
+          }, 8000);
+        };
+
 
 return (
     <div width="95%">
@@ -1497,6 +1736,62 @@ return (
             animation: "pulse 0.5s infinite"
           }}></div>
           Processing Mutation...
+        </div>
+      )}
+
+      {/* Analytical Answer Modal */}
+      {showAnalyticalModal && analyticalAnswer && (
+        <div style={{
+          position: "fixed",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          backgroundColor: "white",
+          border: "2px solid #4CAF50",
+          borderRadius: "8px",
+          padding: "20px",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+          zIndex: 2000,
+          maxWidth: "500px",
+          minWidth: "300px"
+        }}>
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "15px",
+            borderBottom: "1px solid #eee",
+            paddingBottom: "10px"
+          }}>
+            <h3 style={{ margin: 0, color: "#4CAF50" }}>Network Analysis</h3>
+            <button 
+              onClick={() => {
+                setShowAnalyticalModal(false);
+                setAnalyticalAnswer(null);
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                fontSize: "20px",
+                cursor: "pointer",
+                color: "#666"
+              }}
+            >
+              ×
+            </button>
+          </div>
+          
+          <div style={{ marginBottom: "10px" }}>
+            <strong style={{ color: "#666" }}>Question:</strong>
+            <p style={{ margin: "5px 0", fontStyle: "italic" }}>"{analyticalAnswer.question}"</p>
+          </div>
+          
+          <div>
+            <strong style={{ color: "#4CAF50" }}>Answer:</strong>
+            <p style={{ margin: "5px 0", fontSize: "16px", lineHeight: "1.4" }}>
+              {analyticalAnswer.answer}
+            </p>
+          </div>
         </div>
       )}
       
