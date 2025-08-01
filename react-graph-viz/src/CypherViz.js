@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import './App.css';
 import ForceGraph2D from 'react-force-graph-2d';
@@ -1052,17 +1052,6 @@ const NFCTrigger = ({ addNode }) => {
         const [mutatedNodes, setMutatedNodes] = useState([]); // Track nodes created/modified by mutation queries
         const [analyticalAnswer, setAnalyticalAnswer] = useState(null); // For displaying analytical answers
         const [showAnalyticalModal, setShowAnalyticalModal] = useState(false); // For showing/hiding the answer modal
-        const [modalPosition, setModalPosition] = useState(() => {
-          // Calculate center position for initial modal placement
-          const centerX = Math.max(0, (window.innerWidth - 500) / 2);
-          const centerY = Math.max(0, (window.innerHeight - 300) / 2);
-          return { x: centerX, y: centerY };
-        }); // For dragging modals
-        const [isDragging, setIsDragging] = useState(false); // Track if modal is being dragged
-        const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 }); // Track mouse offset during drag
-        const [userHasZoomed, setUserHasZoomed] = useState(false); // Track if user has manually zoomed
-        const [lastUserZoomTime, setLastUserZoomTime] = useState(0); // Track when user last zoomed
-        const lastUserZoomRef = useRef(0); // Ref to track last user zoom time for immediate access
 
         // Detect when latestNode changes (NFC addition) and set lastAction
         useEffect(() => {
@@ -1181,17 +1170,6 @@ const NFCTrigger = ({ addNode }) => {
         
         // Auto-zoom to visible nodes
         useEffect(() => {
-          // Don't auto-zoom if user has recently zoomed manually
-          if (userHasZoomed) {
-            return;
-          }
-          
-          // Additional protection: don't auto-zoom if user zoomed within the last 2 seconds
-          const timeSinceLastUserZoom = Date.now() - lastUserZoomRef.current;
-          if (timeSinceLastUserZoom < 2000) {
-            return;
-          }
-          
           // Only auto-zoom if there's a search term or if a node was clicked (not just hovered)
           // Don't auto-zoom for latestNode unless there's no other focus
           if (fgRef.current && zoomNodes.size > 0) {
@@ -1316,7 +1294,7 @@ const NFCTrigger = ({ addNode }) => {
               }, 1000); // 1 second delay for mutation
             }
           }
-        }, [zoomNodes, data.nodes, fgRef, lastAction, clickedNode, latestNode, inputValue, mutatedNodes, userHasZoomed]);
+        }, [zoomNodes, data.nodes, fgRef, lastAction, clickedNode, latestNode, inputValue, mutatedNodes]);
 
         const handleInputChange = (event) => {
           const input = event.target.value;
@@ -1326,13 +1304,11 @@ const NFCTrigger = ({ addNode }) => {
           // Update user activity when typing
           updateUserActivity();
           
-                      // Clear other actions when searching
-            if (input.trim()) {
-              setClickedNode(null);
-              setLastAction('search');
-              // Reset user zoom flag to allow auto-zoom for search results
-              setUserHasZoomed(false);
-            }
+          // Clear other actions when searching
+          if (input.trim()) {
+            setClickedNode(null);
+            setLastAction('search');
+          }
         };
 
         const handleSubmit = async (e) => {
@@ -1485,20 +1461,11 @@ const NFCTrigger = ({ addNode }) => {
 
         const handleNodeClick = (node) => {
           if (!node) return;
-          
-          // Reset modal position to center
-          const centerX = Math.max(0, (window.innerWidth - 500) / 2);
-          const centerY = Math.max(0, (window.innerHeight - 300) / 2);
-          setModalPosition({ x: centerX, y: centerY });
-          
           setSelectedNode(node);
           setEditedNode({ ...node });
           setFocusNode(node.name);
           setClickedNode(node.name);
           setLastAction('click');
-          
-          // Reset user zoom flag to allow auto-zoom for new actions
-          setUserHasZoomed(false);
           
           // Update user activity when clicking nodes
           updateUserActivity();
@@ -1714,11 +1681,6 @@ const NFCTrigger = ({ addNode }) => {
 
         // Helper function to display analytical answers
         const displayAnalyticalAnswer = (answer, question) => {
-          // Reset modal position to center
-          const centerX = Math.max(0, (window.innerWidth - 500) / 2);
-          const centerY = Math.max(0, (window.innerHeight - 300) / 2);
-          setModalPosition({ x: centerX, y: centerY });
-          
           setAnalyticalAnswer({ answer, question });
           setShowAnalyticalModal(true);
           
@@ -1726,62 +1688,6 @@ const NFCTrigger = ({ addNode }) => {
           setTimeout(() => {
             setShowAnalyticalModal(false);
             setAnalyticalAnswer(null);
-          }, 8000);
-        };
-
-        // Drag event handlers for modals
-        const handleMouseDown = (e) => {
-          setIsDragging(true);
-          const rect = e.currentTarget.getBoundingClientRect();
-          setDragOffset({
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top
-          });
-        };
-
-        const handleMouseMove = (e) => {
-          if (isDragging) {
-            const newX = e.clientX - dragOffset.x;
-            const newY = e.clientY - dragOffset.y;
-            
-            // Keep modal within viewport bounds
-            const maxX = window.innerWidth - 500; // modal width
-            const maxY = window.innerHeight - 300; // approximate modal height
-            
-            setModalPosition({
-              x: Math.max(0, Math.min(newX, maxX)),
-              y: Math.max(0, Math.min(newY, maxY))
-            });
-          }
-        };
-
-        const handleMouseUp = () => {
-          setIsDragging(false);
-        };
-
-        // Add global mouse event listeners for dragging
-        useEffect(() => {
-          if (isDragging) {
-            document.addEventListener('mousemove', handleMouseMove);
-            document.addEventListener('mouseup', handleMouseUp);
-            
-            return () => {
-              document.removeEventListener('mousemove', handleMouseMove);
-              document.removeEventListener('mouseup', handleMouseUp);
-            };
-          }
-        }, [isDragging, dragOffset]);
-
-        // Track user zoom actions
-        const handleUserZoom = () => {
-          const now = Date.now();
-          setUserHasZoomed(true);
-          setLastUserZoomTime(now);
-          lastUserZoomRef.current = now;
-          
-          // Reset user zoom flag after 8 seconds of inactivity (increased delay)
-          setTimeout(() => {
-            setUserHasZoomed(false);
           }, 8000);
         };
 
@@ -1835,41 +1741,56 @@ return (
 
       {/* Analytical Answer Modal */}
       {showAnalyticalModal && analyticalAnswer && (
-        <div 
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.3)",
-            zIndex: 2000,
+        <div style={{
+          position: "fixed",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          backgroundColor: "white",
+          border: "2px solid #4CAF50",
+          borderRadius: "8px",
+          padding: "20px",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+          zIndex: 2000,
+          maxWidth: "500px",
+          minWidth: "300px"
+        }}>
+          <div style={{
             display: "flex",
-            justifyContent: "center",
-            alignItems: "center"
-          }}
-          onClick={() => {
-            setShowAnalyticalModal(false);
-            setAnalyticalAnswer(null);
-          }}
-        >
-          <div 
-            style={{ 
-              position: "absolute", 
-              top: "20%", 
-              left: "50%", 
-              transform: "translate(-50%, -50%)", 
-              padding: "20px", 
-              backgroundColor: "white", 
-              border: "1px solid black", 
-              boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.3)", 
-              zIndex: 2001
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3>Network Analysis</h3>
-            <p><strong>Question:</strong> "{analyticalAnswer.question}"</p>
-            <p><strong>Answer:</strong> {analyticalAnswer.answer}</p>
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "15px",
+            borderBottom: "1px solid #eee",
+            paddingBottom: "10px"
+          }}>
+            <h3 style={{ margin: 0, color: "#4CAF50" }}>Network Analysis</h3>
+            <button 
+              onClick={() => {
+                setShowAnalyticalModal(false);
+                setAnalyticalAnswer(null);
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                fontSize: "20px",
+                cursor: "pointer",
+                color: "#666"
+              }}
+            >
+              ×
+            </button>
+          </div>
+          
+          <div style={{ marginBottom: "10px" }}>
+            <strong style={{ color: "#666" }}>Question:</strong>
+            <p style={{ margin: "5px 0", fontStyle: "italic" }}>"{analyticalAnswer.question}"</p>
+          </div>
+          
+          <div>
+            <strong style={{ color: "#4CAF50" }}>Answer:</strong>
+            <p style={{ margin: "5px 0", fontSize: "16px", lineHeight: "1.4" }}>
+              {analyticalAnswer.answer}
+            </p>
           </div>
         </div>
       )}
@@ -1908,8 +1829,6 @@ return (
     setLastAction(null);
     setMutatedNodes([]);
   }}
-  onZoom={handleUserZoom}
-  onZoomEnd={handleUserZoom}
   nodeCanvasObject={(node, ctx) => {
     const isHighlighted =
       inputValue &&
@@ -2002,100 +1921,72 @@ return (
   linkDirectionalArrowLength={5}
   />
 
-    {selectedNode && editedNode && (
-    <div 
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.3)",
-        zIndex: 1000,
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center"
-      }}
-      onClick={() => setSelectedNode(null)}
-    >
-      <div 
-        style={{ 
-          position: "absolute", 
-          top: "20%", 
-          left: "50%", 
-          transform: "translate(-50%, -50%)", 
-          padding: "20px", 
-          backgroundColor: "white", 
-          border: "1px solid black", 
-          boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.3)", 
-          zIndex: 1001
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {selectedNode.name === latestNode ? (
-          <>
-          <h3>Edit Network Info</h3>
-          <p><strong>Name:</strong>
-          <input 
-          name="name" 
-          value={editedNode.name} 
-          placeholder="Enter name" 
-          onChange={handleEditChange}
-          onFocus={(e) => e.target.placeholder = ""}
-          onBlur={(e) => e.target.placeholder = "Enter name"} 
-          /></p>
+  {selectedNode && editedNode && (
+    <div style={{ position: "absolute", top: "20%", left: "50%", transform: "translate(-50%, -50%)", padding: "20px", backgroundColor: "white", border: "1px solid black", boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.3)", zIndex: 1000 }}>
+    {selectedNode.name === latestNode ? (
+      <>
+      <h3>Edit Network Info</h3>
+      <p><strong>Name:</strong>
+      <input 
+      name="name" 
+      value={editedNode.name} 
+      placeholder="Enter name" 
+      onChange={handleEditChange}
+      onFocus={(e) => e.target.placeholder = ""}
+      onBlur={(e) => e.target.placeholder = "Enter name"} 
+      /></p>
 
-          <p><strong>Role:</strong>
-          <input 
-          name="role" 
-          value={editedNode.role} 
-          placeholder="Enter role" 
-          onChange={handleEditChange}
-          onFocus={(e) => e.target.placeholder = ""}
-          onBlur={(e) => e.target.placeholder = "Enter role"} 
-          /></p>
+      <p><strong>Role:</strong>
+      <input 
+      name="role" 
+      value={editedNode.role} 
+      placeholder="Enter role" 
+      onChange={handleEditChange}
+      onFocus={(e) => e.target.placeholder = ""}
+      onBlur={(e) => e.target.placeholder = "Enter role"} 
+      /></p>
 
-          <p><strong>Location:</strong>
-          <input 
-          name="location" 
-          value={editedNode.location} 
-          placeholder="Enter location" 
-          onChange={handleEditChange}
-          onFocus={(e) => e.target.placeholder = ""}
-          onBlur={(e) => e.target.placeholder = "Enter location"} 
-          /></p>
+      <p><strong>Location:</strong>
+      <input 
+      name="location" 
+      value={editedNode.location} 
+      placeholder="Enter location" 
+      onChange={handleEditChange}
+      onFocus={(e) => e.target.placeholder = ""}
+      onBlur={(e) => e.target.placeholder = "Enter location"} 
+      /></p>
 
-          <p><strong>Website:</strong>
-          <input 
-          name="website" 
-          value={editedNode.website} 
-          placeholder="Enter website" 
-          onChange={handleEditChange}
-          onFocus={(e) => e.target.placeholder = ""}
-          onBlur={(e) => e.target.placeholder = "Enter website"} 
-          /></p>
+      <p><strong>Website:</strong>
+      <input 
+      name="website" 
+      value={editedNode.website} 
+      placeholder="Enter website" 
+      onChange={handleEditChange}
+      onFocus={(e) => e.target.placeholder = ""}
+      onBlur={(e) => e.target.placeholder = "Enter website"} 
+      /></p>
 
-          <p><button onClick={saveNodeChanges}>Save</button></p>
-          </>
-          ) : (
-          <>
-          <h3>Network Info</h3>
-          <p><strong>Name:</strong> {selectedNode?.name}</p>
-          <p><strong>Role:</strong> {selectedNode?.role}</p>
-          <p><strong>Location:</strong> {selectedNode?.location}</p>
-          <p><strong>Website:</strong>{" "}
-          {selectedNode.website && selectedNode.website !== "" ? (
-            <a href={selectedNode.website} target="_blank" rel="noopener noreferrer">
-            {selectedNode.website.length > 30 
-              ? `${selectedNode.website.substring(0, 30)}...`
-            : selectedNode.website}
-            </a>
-            ) : (
-            ""
-          )}</p>
-          </>
-        )}
-      </div>
+      <p><button onClick={saveNodeChanges}>Save</button></p>
+      </>
+      ) : (
+      <>
+      <h3>Network Info</h3>
+      <p><strong>Name:</strong> {selectedNode?.name}</p>
+      <p><strong>Role:</strong> {selectedNode?.role}</p>
+      <p><strong>Location:</strong> {selectedNode?.location}</p>
+      <p><strong>Website:</strong>{" "}
+      {selectedNode.website && selectedNode.website !== "" ? (
+        <a href={selectedNode.website} target="_blank" rel="noopener noreferrer">
+        {selectedNode.website.length > 30 
+          ? `${selectedNode.website.substring(0, 30)}...`
+        : selectedNode.website}
+        </a>
+        ) : (
+        ""
+      )}</p>
+      </>
+    )}
+    <button onClick={() => setSelectedNode(null)}>Close</button>
     </div>
   )}
   </div>
