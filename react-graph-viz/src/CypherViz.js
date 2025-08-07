@@ -1127,7 +1127,8 @@ const NFCTrigger = ({ addNode }) => {
           const searchMatches = data.nodes.filter(node => 
             node.name.toLowerCase().includes(inputValue.toLowerCase()) ||
             (node.location && node.location.toLowerCase().includes(inputValue.toLowerCase())) ||
-            (node.role && node.role.toLowerCase().includes(inputValue.toLowerCase()))
+            (node.role && node.role.toLowerCase().includes(inputValue.toLowerCase())) ||
+            (node.website && node.website.toLowerCase().includes(inputValue.toLowerCase()))
           );
           searchMatches.forEach(match => {
             const matchNeighbors = getNDegreeNodes(match.name, visibleDegree);
@@ -1148,7 +1149,8 @@ const NFCTrigger = ({ addNode }) => {
                            const searchMatches = data.nodes.filter(node => 
                              node.name.toLowerCase().includes(inputValue.toLowerCase()) ||
                              (node.location && node.location.toLowerCase().includes(inputValue.toLowerCase())) ||
-                             (node.role && node.role.toLowerCase().includes(inputValue.toLowerCase()))
+                             (node.role && node.role.toLowerCase().includes(inputValue.toLowerCase())) ||
+                             (node.website && node.website.toLowerCase().includes(inputValue.toLowerCase()))
                            );
                            const searchNodes = new Set();
                            searchMatches.forEach(match => {
@@ -1834,7 +1836,8 @@ return (
       inputValue &&
       (node.name.toLowerCase().includes(inputValue.toLowerCase()) ||
         (node.location && node.location.toLowerCase().includes(inputValue.toLowerCase())) ||
-        (node.role && node.role.toLowerCase().includes(inputValue.toLowerCase())));
+        (node.role && node.role.toLowerCase().includes(inputValue.toLowerCase())) ||
+        (node.website && node.website.toLowerCase().includes(inputValue.toLowerCase())));
     const isNDegree = visibilityNodes.has(node.name);
 
     ctx.globalAlpha = isNDegree ? 1.0 : 0.2;
