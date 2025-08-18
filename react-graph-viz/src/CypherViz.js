@@ -540,15 +540,6 @@ class CypherViz extends React.Component {
         const firstChangedNode = this.changedNodesFromPolling[0];
         this.focusOnPollingNode(firstChangedNode, updatedData);
         
-        // Set a 10-second timeout to clear the focus
-        if (this.pollingFocusTimeout) {
-          clearTimeout(this.pollingFocusTimeout);
-        }
-        this.pollingFocusTimeout = setTimeout(() => {
-          this.setState({ pollingFocusNode: null });
-          this.pollingFocusTimeout = null;
-        }, 10000); // 10 seconds
-        
         // Clear the changed nodes list after focusing
         this.changedNodesFromPolling = [];
       }
@@ -583,16 +574,21 @@ class CypherViz extends React.Component {
       }
 
       try {
-            this.fgRef.current.centerAt(newNode.x, newNode.y, 1000);
-            this.fgRef.current.zoom(1.25);
+        // Temporary focus behavior: 1 second of automatic zooming
+        this.fgRef.current.centerAt(newNode.x, newNode.y, 1000);
+        this.fgRef.current.zoom(1.25, 1000);
         
         // Also ensure the latestNode state is set
         this.setState({ latestNode: nodeName });
         
-        // Clear focus after 1 second to allow free zooming
+        // Set a timeout to clear focus after 1 second and return control to user
+        // Note: We don't clear latestNode here as it controls editability
+        // The focus behavior is handled separately from the editability state
         setTimeout(() => {
-          this.setState({ latestNode: null });
+          // Focus period is over, but latestNode remains for editing
+          // The visual focus will be handled by the GraphView component
         }, 1000);
+        
       } catch (error) {
         setTimeout(() => attemptFocus(attempt + 1), 500);
       }
@@ -622,16 +618,19 @@ class CypherViz extends React.Component {
       }
 
       try {
+        // Temporary focus behavior: 1 second of automatic zooming
         this.fgRef.current.centerAt(newNode.x, newNode.y, 1000);
-        this.fgRef.current.zoom(1.25);
+        this.fgRef.current.zoom(1.25, 1000);
         
         // Set pollingFocusNode (non-editable)
         this.setState({ pollingFocusNode: nodeName });
         
-        // Clear focus after 1 second to allow free zooming
+        // Set a timeout to clear focus after 1 second and return control to user
         setTimeout(() => {
+          // Reset focus state after automatic zooming period
           this.setState({ pollingFocusNode: null });
         }, 1000);
+        
       } catch (error) {
         setTimeout(() => attemptFocus(attempt + 1), 500);
       }
@@ -853,6 +852,11 @@ class CypherViz extends React.Component {
       this.pollingFocusTimeout = null;
     }
     
+    // Clear any global focus timeouts
+    if (window.focusTimeout) {
+      clearTimeout(window.focusTimeout);
+    }
+    
     // Stop breathing animation
     this.stopBreathingAnimation();
     
@@ -1067,6 +1071,10 @@ const NFCTrigger = ({ addNode }) => {
         useEffect(() => {
           if (latestNode) {
             setLastAction('latestNode');
+            // Clear any existing focus timeouts when new visual state is set
+            if (window.focusTimeout) {
+              clearTimeout(window.focusTimeout);
+            }
           }
         }, [latestNode]);
 
@@ -1180,12 +1188,12 @@ const NFCTrigger = ({ addNode }) => {
                          })() :
                          getNDegreeNodes(zoomFocus, visibleDegree);
         
-        // Auto-zoom to visible nodes
+        // Auto-zoom to visible nodes with temporary focus behavior
         useEffect(() => {
           // Only auto-zoom if there's a search term or if a node was clicked (not just hovered)
           // Don't auto-zoom for latestNode unless there's no other focus
           if (fgRef.current && zoomNodes.size > 0) {
-            // Zoom based on last action
+            // Zoom based on last action with temporary focus (1 second)
             if (lastAction === 'click' && clickedNode) {
               const visibleNodes = data.nodes.filter(node => zoomNodes.has(node.name));
               if (visibleNodes.length > 0) {
@@ -1210,8 +1218,15 @@ const NFCTrigger = ({ addNode }) => {
                   2 // Max zoom level
                 );
                 
+                // Temporary focus: 1 second of automatic zooming
                 fgRef.current.centerAt(centerX, centerY, 1000);
                 fgRef.current.zoom(scale, 1000);
+                
+                // Reset focus state after 1 second to return control to user
+                setTimeout(() => {
+                  setClickedNode(null);
+                  setLastAction(null);
+                }, 1000);
               }
             }
             // For search results (only if no node is clicked)
@@ -1239,10 +1254,11 @@ const NFCTrigger = ({ addNode }) => {
                   2 // Max zoom level
                 );
                 
+                // Temporary focus: 1 second of automatic zooming
                 fgRef.current.centerAt(centerX, centerY, 1000);
                 fgRef.current.zoom(scale, 1000);
                 
-                // Clear focus after 1 second to allow free zooming
+                // Reset focus state after 1 second to return control to user
                 setTimeout(() => {
                   setLastAction(null);
                 }, 1000);
@@ -1274,12 +1290,14 @@ const NFCTrigger = ({ addNode }) => {
                     2 // Max zoom level
                   );
                   
+                  // Temporary focus: 1 second of automatic zooming
                   fgRef.current.centerAt(centerX, centerY, 1000);
                   fgRef.current.zoom(scale, 1000);
                   
-                  // Clear focus after 1 second to allow free zooming
+                  // Reset only the lastAction after 1 second, but keep latestNode for editing
                   setTimeout(() => {
                     setLastAction(null);
+                    // latestNode remains for editing - don't clear it
                   }, 1000);
                 }
               }, 1000); // 1 second delay for latestNode
@@ -1310,10 +1328,11 @@ const NFCTrigger = ({ addNode }) => {
                     2 // Max zoom level
                   );
                   
+                  // Temporary focus: 1 second of automatic zooming
                   fgRef.current.centerAt(centerX, centerY, 1000);
                   fgRef.current.zoom(scale, 1000);
                   
-                  // Clear focus after 1 second to allow free zooming
+                  // Reset focus state after 1 second to return control to user
                   setTimeout(() => {
                     setLastAction(null);
                     setMutatedNodes([]);
@@ -1336,6 +1355,10 @@ const NFCTrigger = ({ addNode }) => {
           if (input.trim()) {
             setClickedNode(null);
             setLastAction('search');
+            // Clear any existing focus timeouts when new search action occurs
+            if (window.focusTimeout) {
+              clearTimeout(window.focusTimeout);
+            }
           }
         };
 
@@ -1467,6 +1490,11 @@ const NFCTrigger = ({ addNode }) => {
                 setMutatedNodes(extractedNodes);
                 setLastAction('mutation');
                 
+                // Clear any existing focus timeouts when new mutation occurs
+                if (window.focusTimeout) {
+                  clearTimeout(window.focusTimeout);
+                }
+                
                 // Immediately return to default query without any delay
                 const defaultQuery = `
                   MATCH (u:User)-[r:CONNECTED_TO]->(v:User)
@@ -1500,6 +1528,11 @@ const NFCTrigger = ({ addNode }) => {
           
           // Clear search when clicking a node to avoid zoom conflicts
           setInputValue("");
+          
+          // Reset any existing focus timeouts to prevent conflicts
+          if (window.focusTimeout) {
+            clearTimeout(window.focusTimeout);
+          }
         };
 
         const handleNodeHover = (node) => {
@@ -1815,6 +1848,11 @@ return (
     setSelectedNode(null);
     setShowAnalyticalModal(false);
     setAnalyticalAnswer(null);
+    
+    // Clear any existing focus timeouts
+    if (window.focusTimeout) {
+      clearTimeout(window.focusTimeout);
+    }
   }}
   nodeCanvasObject={(node, ctx) => {
     const isHighlighted =
@@ -1850,12 +1888,14 @@ return (
       nodeRadius = 6 * currentScale;
     }
     
-    // Use latestNode for editing (black), pollingFocusNode for viewing (blue), or white for normal
+    // Use latestNode for editing (black), pollingFocusNode for viewing (green), clickedNode for selection (gray), or white for normal
     let fillColor = "white";
     if (node.name === latestNode) {
-      fillColor = "black"; // Editable node
+      fillColor = "black"; // Editable node - visual state remains active
     } else if (node.name === pollingFocusNode) {
-      fillColor = "green"; // Non-editable polling focus
+      fillColor = "green"; // Non-editable polling focus - visual state remains active
+    } else if (node.name === clickedNode) {
+      fillColor = "gray"; // Clicked node - visual state remains active
     }
     
     // Add subtle color shift during breathing animation
