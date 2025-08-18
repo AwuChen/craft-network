@@ -626,9 +626,9 @@ class CypherViz extends React.Component {
         this.setState({ pollingFocusNode: nodeName });
         
         // Set a timeout to clear focus after 1 second and return control to user
+        // Note: We don't clear pollingFocusNode here as it controls visual highlighting
         setTimeout(() => {
-          // Reset focus state after automatic zooming period
-          this.setState({ pollingFocusNode: null });
+          // Focus period is over, but pollingFocusNode remains for visual highlighting
         }, 1000);
         
       } catch (error) {
@@ -1222,10 +1222,10 @@ const NFCTrigger = ({ addNode }) => {
                 fgRef.current.centerAt(centerX, centerY, 1000);
                 fgRef.current.zoom(scale, 1000);
                 
-                // Reset focus state after 1 second to return control to user
+                // Reset only the lastAction after 1 second, but keep visual states for highlighting
                 setTimeout(() => {
-                  setClickedNode(null);
                   setLastAction(null);
+                  // clickedNode remains for visual highlighting
                 }, 1000);
               }
             }
@@ -1258,9 +1258,10 @@ const NFCTrigger = ({ addNode }) => {
                 fgRef.current.centerAt(centerX, centerY, 1000);
                 fgRef.current.zoom(scale, 1000);
                 
-                // Reset focus state after 1 second to return control to user
+                // Reset only the lastAction after 1 second, but keep visual states for highlighting
                 setTimeout(() => {
                   setLastAction(null);
+                  // clickedNode remains for visual highlighting
                 }, 1000);
               }
             }
@@ -1294,10 +1295,10 @@ const NFCTrigger = ({ addNode }) => {
                   fgRef.current.centerAt(centerX, centerY, 1000);
                   fgRef.current.zoom(scale, 1000);
                   
-                  // Reset only the lastAction after 1 second, but keep latestNode for editing
+                  // Reset only the lastAction after 1 second, but keep visual states for highlighting
                   setTimeout(() => {
                     setLastAction(null);
-                    // latestNode remains for editing - don't clear it
+                    // latestNode, clickedNode, and pollingFocusNode remain for visual highlighting
                   }, 1000);
                 }
               }, 1000); // 1 second delay for latestNode
@@ -1332,10 +1333,10 @@ const NFCTrigger = ({ addNode }) => {
                   fgRef.current.centerAt(centerX, centerY, 1000);
                   fgRef.current.zoom(scale, 1000);
                   
-                  // Reset focus state after 1 second to return control to user
+                  // Reset only the lastAction after 1 second, but keep visual states for highlighting
                   setTimeout(() => {
                     setLastAction(null);
-                    setMutatedNodes([]);
+                    // mutatedNodes remains for visual highlighting
                   }, 1000);
                 }
               }, 1000); // 1 second delay for mutation
