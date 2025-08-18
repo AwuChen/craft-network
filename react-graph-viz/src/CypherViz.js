@@ -583,11 +583,16 @@ class CypherViz extends React.Component {
       }
 
       try {
-            this.fgRef.current.centerAt(newNode.x, newNode.y, 1500);
+            this.fgRef.current.centerAt(newNode.x, newNode.y, 1000);
             this.fgRef.current.zoom(1.25);
         
         // Also ensure the latestNode state is set
         this.setState({ latestNode: nodeName });
+        
+        // Clear focus after 1 second to allow free zooming
+        setTimeout(() => {
+          this.setState({ latestNode: null });
+        }, 1000);
       } catch (error) {
         setTimeout(() => attemptFocus(attempt + 1), 500);
       }
@@ -617,11 +622,16 @@ class CypherViz extends React.Component {
       }
 
       try {
-        this.fgRef.current.centerAt(newNode.x, newNode.y, 1500);
+        this.fgRef.current.centerAt(newNode.x, newNode.y, 1000);
         this.fgRef.current.zoom(1.25);
         
         // Set pollingFocusNode (non-editable)
         this.setState({ pollingFocusNode: nodeName });
+        
+        // Clear focus after 1 second to allow free zooming
+        setTimeout(() => {
+          this.setState({ pollingFocusNode: null });
+        }, 1000);
       } catch (error) {
         setTimeout(() => attemptFocus(attempt + 1), 500);
       }
@@ -1231,6 +1241,11 @@ const NFCTrigger = ({ addNode }) => {
                 
                 fgRef.current.centerAt(centerX, centerY, 1000);
                 fgRef.current.zoom(scale, 1000);
+                
+                // Clear focus after 1 second to allow free zooming
+                setTimeout(() => {
+                  setLastAction(null);
+                }, 1000);
               }
             }
             // For latestNode, delay the zoom to allow graph to stabilize
@@ -1261,6 +1276,11 @@ const NFCTrigger = ({ addNode }) => {
                   
                   fgRef.current.centerAt(centerX, centerY, 1000);
                   fgRef.current.zoom(scale, 1000);
+                  
+                  // Clear focus after 1 second to allow free zooming
+                  setTimeout(() => {
+                    setLastAction(null);
+                  }, 1000);
                 }
               }, 1000); // 1 second delay for latestNode
             }
@@ -1292,6 +1312,12 @@ const NFCTrigger = ({ addNode }) => {
                   
                   fgRef.current.centerAt(centerX, centerY, 1000);
                   fgRef.current.zoom(scale, 1000);
+                  
+                  // Clear focus after 1 second to allow free zooming
+                  setTimeout(() => {
+                    setLastAction(null);
+                    setMutatedNodes([]);
+                  }, 1000);
                 }
               }, 1000); // 1 second delay for mutation
             }
@@ -1317,7 +1343,7 @@ const NFCTrigger = ({ addNode }) => {
           e.preventDefault();
 
           try {
-            const response = await fetch("https://flowise-hako.onrender.com/api/v1/prediction/29e305b3-c569-4676-a454-1c4fdc380c69", {
+            const response = await fetch("https://flowise-hako.onrender.com/api/v1/prediction/51277ee1-555e-4475-8d36-8f4affd9ecb5", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ question: inputValue })
@@ -1743,57 +1769,13 @@ return (
 
       {/* Analytical Answer Modal */}
       {showAnalyticalModal && analyticalAnswer && (
-        <div style={{
-          position: "fixed",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          backgroundColor: "white",
-          border: "2px solid #4CAF50",
-          borderRadius: "8px",
-          padding: "20px",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
-          zIndex: 2000,
-          maxWidth: "500px",
-          minWidth: "300px"
-        }}>
-          <div style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "15px",
-            borderBottom: "1px solid #eee",
-            paddingBottom: "10px"
-          }}>
-            <h3 style={{ margin: 0, color: "#4CAF50" }}>Network Analysis</h3>
-            <button 
-              onClick={() => {
-                setShowAnalyticalModal(false);
-                setAnalyticalAnswer(null);
-              }}
-              style={{
-                background: "none",
-                border: "none",
-                fontSize: "20px",
-                cursor: "pointer",
-                color: "#666"
-              }}
-            >
-              ×
-            </button>
-          </div>
-          
-          <div style={{ marginBottom: "10px" }}>
-            <strong style={{ color: "#666" }}>Question:</strong>
-            <p style={{ margin: "5px 0", fontStyle: "italic" }}>"{analyticalAnswer.question}"</p>
-          </div>
-          
-          <div>
-            <strong style={{ color: "#4CAF50" }}>Answer:</strong>
-            <p style={{ margin: "5px 0", fontSize: "16px", lineHeight: "1.4" }}>
-              {analyticalAnswer.answer}
-            </p>
-          </div>
+        <div 
+          style={{ position: "absolute", top: "20%", left: "50%", transform: "translate(-50%, -50%)", padding: "20px", backgroundColor: "white", border: "1px solid black", boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.3)", zIndex: 1000 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h3>Network Analysis</h3>
+          <p><strong>Question:</strong> "{analyticalAnswer.question}"</p>
+          <p><strong>Answer:</strong> {analyticalAnswer.answer}</p>
         </div>
       )}
       
@@ -1830,6 +1812,9 @@ return (
     setClickedNode(null);
     setLastAction(null);
     setMutatedNodes([]);
+    setSelectedNode(null);
+    setShowAnalyticalModal(false);
+    setAnalyticalAnswer(null);
   }}
   nodeCanvasObject={(node, ctx) => {
     const isHighlighted =
@@ -1925,7 +1910,10 @@ return (
   />
 
   {selectedNode && editedNode && (
-    <div style={{ position: "absolute", top: "20%", left: "50%", transform: "translate(-50%, -50%)", padding: "20px", backgroundColor: "white", border: "1px solid black", boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.3)", zIndex: 1000 }}>
+    <div 
+      style={{ position: "absolute", top: "20%", left: "50%", transform: "translate(-50%, -50%)", padding: "20px", backgroundColor: "white", border: "1px solid black", boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.3)", zIndex: 1000 }}
+      onClick={(e) => e.stopPropagation()}
+    >
     {selectedNode.name === latestNode ? (
       <>
       <h3>Edit Network Info</h3>
@@ -1989,7 +1977,6 @@ return (
       )}</p>
       </>
     )}
-    <button onClick={() => setSelectedNode(null)}>Close</button>
     </div>
   )}
   </div>
