@@ -3,6 +3,9 @@ import { HashRouter as Router, Route, Routes, useLocation, useParams } from 'rea
 import './App.css';
 import ForceGraph2D from 'react-force-graph-2d';
 import * as d3 from 'd3';
+import { generateCypherFromNaturalLanguage } from './llmCypher';
+import { fetchLiveRoster } from './craftNetworkData';
+import { startNeo4jKeepAlive } from './neo4jKeepAlive';
 
 class CypherViz extends React.Component {
   constructor({ driver }) {
@@ -59,6 +62,8 @@ class CypherViz extends React.Component {
     this.breathingInterval = null; // Interval for breathing cycle
     this.scaleTransitionStart = null; // For smooth scaling transition
     this.scaleTransitionDuration = 1000; // 1 second transition
+    this.stopKeepAlive = null;
+    this.rosterRefreshInterval = null;
 
   }
 
@@ -810,6 +815,18 @@ class CypherViz extends React.Component {
   componentDidMount() {
     // Validate and clean the query state first
     this.validateAndCleanQuery();
+
+    fetchLiveRoster(this.driver).catch((err) => {
+      console.warn('Using static roster fallback:', err.message || err);
+    });
+
+    this.rosterRefreshInterval = setInterval(() => {
+      fetchLiveRoster(this.driver).catch((err) => {
+        console.warn('Roster refresh failed:', err.message || err);
+      });
+    }, 6 * 60 * 60 * 1000);
+
+    this.stopKeepAlive = startNeo4jKeepAlive(this.driver);
     
     this.loadData();
     
@@ -831,6 +848,16 @@ class CypherViz extends React.Component {
     // Clean up both polling and WebSocket
     this.stopPolling();
     this.disconnectWebSocket();
+
+    if (this.stopKeepAlive) {
+      this.stopKeepAlive();
+      this.stopKeepAlive = null;
+    }
+
+    if (this.rosterRefreshInterval) {
+      clearInterval(this.rosterRefreshInterval);
+      this.rosterRefreshInterval = null;
+    }
     
     // Clear custom query timeout
     if (this.state.customQueryTimeout) {
@@ -1066,6 +1093,8 @@ const NFCTrigger = ({ addNode }) => {
         const [mutatedNodes, setMutatedNodes] = useState([]); // Track nodes created/modified by mutation queries
         const [analyticalAnswer, setAnalyticalAnswer] = useState(null); // For displaying analytical answers
         const [showAnalyticalModal, setShowAnalyticalModal] = useState(false); // For showing/hiding the answer modal
+        const [isSearching, setIsSearching] = useState(false);
+        const [searchError, setSearchError] = useState(null);
 
         // Detect when latestNode changes (NFC addition) and set lastAction
         useEffect(() => {
@@ -1363,157 +1392,93 @@ const NFCTrigger = ({ addNode }) => {
           }
         };
 
+        const extractMutatedNodes = (generatedQuery) => {
+          if (generatedQuery.includes('DELETE')) {
+            const deleteMatches = generatedQuery.match(/\{name:\s*['"]([^'"]+)['"]\}/g);
+            if (deleteMatches) {
+              return deleteMatches.map((match) => {
+                const nameMatch = match.match(/name:\s*['"]([^'"]+)['"]/);
+                return nameMatch ? nameMatch[1] : null;
+              }).filter(Boolean);
+            }
+          } else if (generatedQuery.includes('SET')) {
+            const matchClause = generatedQuery.match(/MATCH\s*\([^)]*\{name:\s*['"]([^'"]+)['"][^}]*\}\)/i);
+            if (matchClause) {
+              return [matchClause[1]];
+            }
+          } else {
+            const nodeMatches = generatedQuery.match(/\{([^}]+)\}/g);
+            return nodeMatches
+              ? nodeMatches.map((match) => {
+                  const nameMatch = match.match(/name:\s*['"]([^'"]+)['"]/);
+                  return nameMatch ? nameMatch[1] : null;
+                }).filter(Boolean)
+              : [];
+          }
+          return [];
+        };
+
         const handleSubmit = async (e) => {
           e.preventDefault();
+          if (!inputValue.trim() || isSearching) return;
+
+          setIsSearching(true);
+          setSearchError(null);
+          updateUserActivity();
 
           try {
-            const response = await fetch("https://flowise-hako.onrender.com/api/v1/prediction/51277ee1-555e-4475-8d36-8f4affd9ecb5", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ question: inputValue })
-            });
+            const { cypher: generatedQuery, intent } = await generateCypherFromNaturalLanguage(inputValue);
 
-            const data = await response.json();
-            const generatedQuery = data.text || data.query || "";
-
-            // More specific detection for true analytical questions vs visualization requests
-            const isTrueAnalyticalQuestion = (() => {
-              const question = inputValue.toLowerCase();
-              const analyticalKeywords = ['how many', 'how much', 'what is', 'what are', 'when', 'where', 'why', 'who', 'which', 'how', 'what'];
-              
-              // True analytical questions that ask for specific data points
-              const analyticalPatterns = [
-                /how many/i,
-                /how much/i,
-                /what is the (count|number|total)/i,
-                /what are the (count|numbers|totals)/i,
-                /count of/i,
-                /total number of/i,
-                /how many (artists|users|people|connections|relationships)/i,
-                /what (roles|locations|websites) (exist|are there)/i,
-                /which (roles|locations|websites)/i,
-                /what is the most common/i,
-                /what is the average/i,
-                /how many people are (in|from)/i
-              ];
-              
-              // Visualization requests that should NOT be treated as analytical
-              const visualizationPatterns = [
-                /show me/i,
-                /display/i,
-                /visualize/i,
-                /find/i,
-                /search for/i,
-                /look for/i,
-                /get/i,
-                /bring up/i,
-                /open/i
-              ];
-              
-              // If it matches visualization patterns, it's NOT analytical
-              if (visualizationPatterns.some(pattern => pattern.test(question))) {
-                return false;
-              }
-              
-              // If it matches analytical patterns, it IS analytical
-              if (analyticalPatterns.some(pattern => pattern.test(question))) {
-                return true;
-              }
-              
-              // Default: if it contains analytical keywords but doesn't match visualization patterns
-              return analyticalKeywords.some(keyword => question.includes(keyword));
-            })();
-
-            if (isTrueAnalyticalQuestion) {
-              // For analytical questions, execute the query and provide a text answer
+            if (intent === 'analytical') {
+              const session = driver.session({ database: "neo4j" });
               try {
-                const session = driver.session({ database: "neo4j" });
                 const result = await session.run(generatedQuery);
-                await session.close();
-
-                // Generate a human-readable answer based on the query results
                 const answer = generateAnalyticalAnswer(inputValue, result, generatedQuery);
-                
-                // Display the answer in a modal or notification
                 displayAnalyticalAnswer(answer, inputValue);
-                
-                // Clear the input after showing the answer
-                setTimeout(() => {
-                  setInputValue("");
-                }, 5000); // Keep answer visible longer for analytical questions
-                
+                setTimeout(() => setInputValue(""), 5000);
               } catch (queryError) {
                 console.error("Error executing analytical query:", queryError);
-                displayAnalyticalAnswer("Sorry, I couldn't analyze that question. Please try rephrasing it.", inputValue);
+                displayAnalyticalAnswer(
+                  `Sorry, I couldn't run that query. ${queryError.message || 'Try rephrasing your question.'}`,
+                  inputValue
+                );
+              } finally {
+                await session.close();
               }
-            } else {
-              // For regular queries, proceed with the existing logic
-              setInputValue(generatedQuery);
-              handleChange({ target: { value: generatedQuery } });
+              return;
+            }
 
-              await loadData(null, generatedQuery);
+            setInputValue(generatedQuery);
+            handleChange({ target: { value: generatedQuery } });
+            await loadData(null, generatedQuery);
 
-              // Check if the generated query is a mutation query (updates the graph)
-              const isMutationQuery = /(CREATE|MERGE|SET|DELETE|REMOVE|DETACH DELETE)/i.test(generatedQuery.trim());
-              
-              // If it's a mutation query, immediately return to default state
-              if (isMutationQuery) {
-                
-                // Extract node names from the mutation query to track what was created/modified
-                let extractedNodes = [];
-                
-                // Handle different mutation query patterns
-                if (generatedQuery.includes('DELETE')) {
-                  // For DELETE queries, extract from patterns like DELETE (u:User {name: "John"}) or MATCH (u:User {name: "John"}) DELETE u
-                  const deleteMatches = generatedQuery.match(/\{name:\s*['"]([^'"]+)['"]\}/g);
-                  if (deleteMatches) {
-                    extractedNodes = deleteMatches.map(match => {
-                      const nameMatch = match.match(/name:\s*['"]([^'"]+)['"]/);
-                      return nameMatch ? nameMatch[1] : null;
-                    }).filter(Boolean);
-                  }
-                } else if (generatedQuery.includes('SET')) {
-                  // For SET queries, extract from MATCH clause like MATCH (u:User {name: "John"}) SET u.role = 'admin'
-                  const matchClause = generatedQuery.match(/MATCH\s*\([^)]*\{name:\s*['"]([^'"]+)['"][^}]*\}\)/i);
-                  if (matchClause) {
-                    extractedNodes = [matchClause[1]];
-                  }
-                } else {
-                  // For CREATE/MERGE queries, extract from {name: "nodeName"} patterns
-                  const nodeMatches = generatedQuery.match(/\{([^}]+)\}/g);
-                  extractedNodes = nodeMatches ? 
-                    nodeMatches.map(match => {
-                      const nameMatch = match.match(/name:\s*['"]([^'"]+)['"]/);
-                      return nameMatch ? nameMatch[1] : null;
-                    }).filter(Boolean) : [];
-                }
-                
-                setMutatedNodes(extractedNodes);
-                setLastAction('mutation');
-                
-                // Clear any existing focus timeouts when new mutation occurs
-                if (window.focusTimeout) {
-                  clearTimeout(window.focusTimeout);
-                }
-                
-                // Immediately return to default query without any delay
-                const defaultQuery = `
+            const isMutationQuery = intent === 'mutation' ||
+              /(CREATE|MERGE|SET|DELETE|REMOVE|DETACH DELETE)/i.test(generatedQuery.trim());
+
+            if (isMutationQuery) {
+              const extractedNodes = extractMutatedNodes(generatedQuery);
+              setMutatedNodes(extractedNodes);
+              setLastAction('mutation');
+
+              if (window.focusTimeout) {
+                clearTimeout(window.focusTimeout);
+              }
+
+              const defaultQuery = `
                   MATCH (u:User)-[r:CONNECTED_TO]->(v:User)
                   RETURN u.name AS source, u.role AS sourceRole, u.location AS sourceLocation, u.website AS sourceWebsite, 
                          v.name AS target, v.role AS targetRole, v.location AS targetLocation, v.website AS targetWebsite
                 `;
-                await loadData(null, defaultQuery);
-              }
-              
-              // Clear the input after 3 seconds
-              setTimeout(() => {
-                setInputValue("");
-              }, 3000);
+              await loadData(null, defaultQuery);
             }
-            
-            } catch (error) {
-              console.error("Flowise call failed:", error);
-            }
+
+            setTimeout(() => setInputValue(""), 3000);
+          } catch (error) {
+            console.error("Search failed:", error);
+            setSearchError(error.message || 'Search failed. Check your API key and try again.');
+          } finally {
+            setIsSearching(false);
+          }
         };
 
         const handleNodeClick = (node) => {
@@ -1758,8 +1723,9 @@ return (
     <div width="95%">
       <input
         type="text"
-        placeholder="Show me all the artist in Kyoto..."
-        style={{ display: "block", width: "95%", height: "40px", margin: "0 auto", textAlign: "center", padding: "8px", border: "1px solid #ccc", borderRadius: "4px" }}
+        placeholder={isSearching ? "Generating Cypher..." : "Ask in plain English or paste a Cypher query..."}
+        disabled={isSearching}
+        style={{ display: "block", width: "95%", height: "40px", margin: "0 auto", textAlign: "center", padding: "8px", border: "1px solid #ccc", borderRadius: "4px", opacity: isSearching ? 0.7 : 1 }}
         value={inputValue}
         onChange={handleInputChange}
         onKeyPress={(e) => {
@@ -1769,6 +1735,11 @@ return (
           }
         }}
       />
+      {searchError && (
+        <div style={{ width: "95%", margin: "8px auto 0", padding: "8px 12px", backgroundColor: "#ffebee", color: "#b71c1c", borderRadius: "4px", fontSize: "13px", textAlign: "center" }}>
+          {searchError}
+        </div>
+      )}
       <button id="visualize" onClick={() => window.open("https://awuchen.github.io/craft-network-3d/", "_blank")}>Visualize3D</button>
       <button id="info" onClick={() => window.open("https://www.hako.soooul.xyz/drafts/washi", "_blank")}>Info</button>
       
