@@ -7,6 +7,7 @@
     "@testing-library/jest-dom": "^4.2.4",
     "@testing-library/react": "^9.3.2",
     "@testing-library/user-event": "^7.1.2",
+    "d3": "^7.9.0",
     "neo4j-driver": "^4.0.2",
     "react": "^16.13.1",
     "react-dom": "^16.13.1",
@@ -20,7 +21,9 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "sync-roster": "node scripts/sync-craft-network-data.js",
+    "neo4j-keepalive": "node scripts/neo4j-keepalive.js"
   },
   "eslintConfig": {
     "extends": "react-app"
