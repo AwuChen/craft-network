@@ -20,20 +20,22 @@ LIMIT $limit
 `;
 
 function buildGraph(records) {
-  const links = records.map((r) => ({
-    source: r.get('source'),
-    target: r.get('target'),
-  }));
-
   const nodesMap = new Map();
+  const links = [];
+
   const addNode = (id, role, title, website) => {
     if (!id || nodesMap.has(id)) return;
     nodesMap.set(id, { id, name: id, role, title, website });
   };
 
   records.forEach((r) => {
-    addNode(r.get('source'), r.get('sourceRole'), r.get('sourceTitle'), r.get('sourceWebsite'));
-    addNode(r.get('target'), r.get('role'), r.get('title'), r.get('website'));
+    const source = r.get('source');
+    const target = r.get('target');
+    if (!source || !target) return;
+
+    addNode(source, r.get('sourceRole'), r.get('sourceTitle'), r.get('sourceWebsite'));
+    addNode(target, r.get('role'), r.get('title'), r.get('website'));
+    links.push({ source, target });
   });
 
   return {
