@@ -486,11 +486,6 @@ class CypherViz extends React.Component {
 
     const nodes = Array.from(nodesMap.values());
     const updatedData = { nodes, links };
-    
-    // Check if our NFC node is in the parsed results
-    if (this.pendingNFCNode) {
-      const nfcNodeInResults = nodes.find(n => n.name === this.pendingNFCNode);
-    }
 
     // Calculate hash of current data for change detection
     const currentDataHash = this.calculateDataHash(updatedData);
@@ -946,8 +941,14 @@ class CypherViz extends React.Component {
       // Wait for the state to be updated, then focus
       let checkCount = 0;
       const waitForStateUpdate = () => {
-        const nodeExists = this.state.data.nodes.find(n => n.name === capitalizedNewUser);
         checkCount++;
+        if (checkCount > 20) {
+          this.pendingNFCNode = null;
+          this.isNFCOperation = false;
+          return;
+        }
+
+        const nodeExists = this.state.data.nodes.find(n => n.name === capitalizedNewUser);
         
         if (nodeExists) {
           this.focusOnNewNode(capitalizedNewUser, this.state.data);
@@ -1078,7 +1079,7 @@ const NFCTrigger = ({ addNode }) => {
         };
 
         addAndRedirect();
-        }, [location, username]);
+        }, [location, username, addNode]);
 
         return <div style={{ textAlign: "center", padding: "20px", fontSize: "16px", color: "red" }}>Adding you to {username}'s network...</div>
       };
@@ -1119,19 +1120,6 @@ const NFCTrigger = ({ addNode }) => {
           }
         }, [data.nodes, fgRef, lastAction]);
 
-        // Compute 1-degree neighbors of latestNode
-        const getOneDegreeNodes = () => {
-          if (!latestNode || !data) return new Set();
-          const neighbors = new Set();
-          neighbors.add(latestNode);
-          data.links.forEach(link => {
-            if (link.source === latestNode) neighbors.add(link.target);
-            if (link.target === latestNode) neighbors.add(link.source);
-          });
-          return neighbors;
-        };
-        const oneDegreeNodes = getOneDegreeNodes();
-
         // Compute N-degree neighbors of latestNode
         const visibleDegree = 1; // Change this value to adjust visible degree
         const getNDegreeNodes = (startNode, degree) => {
@@ -1139,12 +1127,13 @@ const NFCTrigger = ({ addNode }) => {
           const visited = new Set();
           let currentLevel = new Set([startNode]);
           for (let d = 0; d < degree; d++) {
+            const level = currentLevel;
             const nextLevel = new Set();
             data.links.forEach(link => {
               // Normalize source/target to node names if they are objects
               const sourceName = typeof link.source === 'object' ? link.source.name : link.source;
               const targetName = typeof link.target === 'object' ? link.target.name : link.target;
-              currentLevel.forEach(n => {
+              level.forEach(n => {
                 if (n === sourceName && !visited.has(targetName)) {
                   nextLevel.add(targetName);
                 }
@@ -1154,7 +1143,7 @@ const NFCTrigger = ({ addNode }) => {
               });
             });
             nextLevel.forEach(n => visited.add(n));
-            currentLevel.forEach(n => visited.add(n));
+            level.forEach(n => visited.add(n));
             currentLevel = nextLevel;
           }
           visited.add(startNode);
