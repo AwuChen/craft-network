@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter as Router, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import './App.css';
 import ForceGraph2D from 'react-force-graph-2d';
 import * as d3 from 'd3';
 import { generateCypherFromNaturalLanguage } from './llmCypher';
+import { generatePersonProfile } from './llmProfile';
+import { fetchUserProfile, saveUserWithProfile, saveUserFieldsOnly, formatCraftForDisplay } from './userProfile';
+import ProfileReviewModal from './ProfileReviewModal';
 import { fetchLiveRoster } from './craftNetworkData';
 import { startNeo4jKeepAlive } from './neo4jKeepAlive';
 
@@ -1096,6 +1099,73 @@ const NFCTrigger = ({ addNode }) => {
         const [showAnalyticalModal, setShowAnalyticalModal] = useState(false); // For showing/hiding the answer modal
         const [isSearching, setIsSearching] = useState(false);
         const [searchError, setSearchError] = useState(null);
+        const [showProfileModal, setShowProfileModal] = useState(false);
+        const [generatedProfile, setGeneratedProfile] = useState(null);
+        const [profileError, setProfileError] = useState(null);
+        const [isGeneratingProfile, setIsGeneratingProfile] = useState(false);
+        const [isSavingNode, setIsSavingNode] = useState(false);
+        const [storedProfile, setStoredProfile] = useState(null);
+        const openedForLatestRef = useRef(null);
+
+        const capitalizeWords = (str) => {
+          if (!str) return str;
+          return str.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+        };
+
+        const formatWebsite = (website) => {
+          let formattedWebsite = (website || '').trim();
+          if (formattedWebsite && !formattedWebsite.startsWith("http://") && !formattedWebsite.startsWith("https://")) {
+            formattedWebsite = "https://" + formattedWebsite;
+          }
+          return formattedWebsite;
+        };
+
+        const buildPersonPayload = (node) => ({
+          name: capitalizeWords(node.name),
+          role: capitalizeWords(node.role),
+          location: capitalizeWords(node.location),
+          website: formatWebsite(node.website),
+        });
+
+        const buildEditedNodeState = (node) => ({
+          name: node.name,
+          role: formatCraftForDisplay(node),
+          location: node.location || '',
+          website: node.website || '',
+        });
+
+        // Auto-open edit panel when a new node enters the network (NFC / mutation)
+        useEffect(() => {
+          if (!latestNode) return;
+          const node = data.nodes.find((n) => n.name === latestNode);
+          if (!node) return;
+          if (openedForLatestRef.current === latestNode) return;
+
+          openedForLatestRef.current = latestNode;
+          setSelectedNode(node);
+          setEditedNode(buildEditedNodeState(node));
+          setLastAction('latestNode');
+        }, [latestNode, data.nodes]);
+
+        useEffect(() => {
+          if (!selectedNode || selectedNode.name === latestNode) {
+            setStoredProfile(null);
+            return undefined;
+          }
+
+          let cancelled = false;
+          fetchUserProfile(driver, selectedNode.name)
+            .then((profile) => {
+              if (!cancelled) setStoredProfile(profile);
+            })
+            .catch(() => {
+              if (!cancelled) setStoredProfile(null);
+            });
+
+          return () => {
+            cancelled = true;
+          };
+        }, [selectedNode, latestNode, driver]);
 
         // Detect when latestNode changes (NFC addition) and set lastAction
         useEffect(() => {
@@ -1473,7 +1543,7 @@ const NFCTrigger = ({ addNode }) => {
         const handleNodeClick = (node) => {
           if (!node) return;
           setSelectedNode(node);
-          setEditedNode({ ...node });
+          setEditedNode(buildEditedNodeState(node));
           setFocusNode(node.name);
           setClickedNode(node.name);
           setLastAction('click');
@@ -1487,6 +1557,84 @@ const NFCTrigger = ({ addNode }) => {
           // Reset any existing focus timeouts to prevent conflicts
           if (window.focusTimeout) {
             clearTimeout(window.focusTimeout);
+          }
+        };
+
+        const closeProfileFlow = () => {
+          setShowProfileModal(false);
+          setGeneratedProfile(null);
+          setProfileError(null);
+          setIsGeneratingProfile(false);
+        };
+
+        const persistNode = async (profile, verified) => {
+          if (!editedNode || !selectedNode) return;
+
+          setIsSavingNode(true);
+          try {
+            const person = buildPersonPayload(editedNode);
+            if (profile && verified) {
+              await saveUserWithProfile(driver, {
+                oldName: selectedNode.name,
+                ...person,
+                profile,
+                verified: true,
+              });
+            } else {
+              await saveUserFieldsOnly(driver, {
+                oldName: selectedNode.name,
+                ...person,
+              });
+            }
+            await loadData(person.name);
+            closeProfileFlow();
+            setSelectedNode(null);
+          } catch (error) {
+            console.error("Error saving node:", error);
+            setProfileError(error.message || 'Failed to save');
+          } finally {
+            setIsSavingNode(false);
+          }
+        };
+
+        const handleGenerateProfile = async () => {
+          if (!editedNode?.name?.trim() || !editedNode?.role?.trim()) {
+            setProfileError('Enter your name and craft (e.g. pottery, oil painter, curator).');
+            setShowProfileModal(true);
+            return;
+          }
+
+          setShowProfileModal(true);
+          setIsGeneratingProfile(true);
+          setProfileError(null);
+          setGeneratedProfile(null);
+
+          try {
+            const { profile } = await generatePersonProfile(buildPersonPayload(editedNode));
+            setGeneratedProfile(profile);
+          } catch (error) {
+            console.error('Profile generation failed:', error);
+            setProfileError(error.message || 'Profile generation failed');
+          } finally {
+            setIsGeneratingProfile(false);
+          }
+        };
+
+        const handleConfirmProfile = (profile) => persistNode(profile, true);
+        const handleSaveEditedProfile = (profile) => persistNode(profile, true);
+        const handleSkipProfile = () => persistNode(null, false);
+
+        const handleRegenerateProfile = async () => {
+          setGeneratedProfile(null);
+          setProfileError(null);
+          setIsGeneratingProfile(true);
+          try {
+            const { profile } = await generatePersonProfile(buildPersonPayload(editedNode));
+            setGeneratedProfile(profile);
+          } catch (error) {
+            setProfileError(error.message || 'Profile generation failed');
+          } finally {
+            setIsGeneratingProfile(false);
           }
         };
 
@@ -1508,39 +1656,7 @@ const NFCTrigger = ({ addNode }) => {
 
         const saveNodeChanges = async () => {
           if (!editedNode || !selectedNode) return;
-
-          // Helper function to capitalize first letter of each word
-          const capitalizeWords = (str) => {
-            if (!str) return str;
-            return str.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
-          };
-
-          // Ensure the website has "https://" if missing
-          let formattedWebsite = editedNode.website.trim();
-          if (formattedWebsite && !formattedWebsite.startsWith("http://") && !formattedWebsite.startsWith("https://")) {
-            formattedWebsite = "https://" + formattedWebsite;
-          }
-
-          const session = driver.session();
-          try {
-            await session.run(
-              `MATCH (u:User {name: $oldName}) 
-              SET u.name = $newName, u.role = $role, u.location = $location, u.website = $website`,
-              {
-                oldName: selectedNode.name,
-                newName: capitalizeWords(editedNode.name),
-                role: capitalizeWords(editedNode.role),
-                location: capitalizeWords(editedNode.location),
-                website: formattedWebsite, // Use the corrected website
-              }
-            );
-            await loadData(editedNode.name); // Keep the edited node as latestNode
-            setSelectedNode(null); // Close the panel
-          } catch (error) {
-            console.error("Error updating node:", error);
-          } finally {
-            session.close();
-          }
+          await handleGenerateProfile();
         };
 
         // Helper function to generate human-readable answers from query results
@@ -1917,7 +2033,10 @@ return (
     >
     {selectedNode.name === latestNode ? (
       <>
-      <h3>Edit Network Info</h3>
+      <h3>Welcome to the Craft Network</h3>
+      <p style={{ fontSize: '14px', marginBottom: '12px' }}>
+        Tell us your name and craft — pottery, painting, curation, and the like — then we&apos;ll draft a profile for you to confirm.
+      </p>
       <p><strong>Name:</strong>
       <input 
       name="name" 
@@ -1928,14 +2047,14 @@ return (
       onBlur={(e) => e.target.placeholder = "Enter name"} 
       /></p>
 
-      <p><strong>Role:</strong>
+      <p><strong>Your craft:</strong>
       <input 
       name="role" 
       value={editedNode.role} 
-      placeholder="Enter role" 
+      placeholder="e.g. Pottery, Oil painter, Curator" 
       onChange={handleEditChange}
       onFocus={(e) => e.target.placeholder = ""}
-      onBlur={(e) => e.target.placeholder = "Enter role"} 
+      onBlur={(e) => e.target.placeholder = "e.g. Pottery, Oil painter, Curator"} 
       /></p>
 
       <p><strong>Location:</strong>
@@ -1958,13 +2077,30 @@ return (
       onBlur={(e) => e.target.placeholder = "Enter website"} 
       /></p>
 
-      <p><button onClick={saveNodeChanges}>Save</button></p>
+      <p>
+        <button onClick={saveNodeChanges} disabled={isSavingNode || isGeneratingProfile}>
+          {isGeneratingProfile ? 'Generating…' : 'Continue → Generate profile'}
+        </button>
+      </p>
+      <p>
+        <button
+          type="button"
+          onClick={handleSkipProfile}
+          disabled={isSavingNode || isGeneratingProfile}
+          style={{ background: 'transparent', border: 'none', textDecoration: 'underline', cursor: 'pointer' }}
+        >
+          Save without profile
+        </button>
+      </p>
       </>
       ) : (
       <>
       <h3>Network Info</h3>
       <p><strong>Name:</strong> {selectedNode?.name}</p>
-      <p><strong>Role:</strong> {selectedNode?.role}</p>
+      <p><strong>Craft:</strong> {formatCraftForDisplay(selectedNode)}</p>
+      {storedProfile?.tagline && storedProfile.verified && (
+        <p style={{ fontStyle: 'italic' }}>{storedProfile.tagline}</p>
+      )}
       <p><strong>Location:</strong> {selectedNode?.location}</p>
       <p><strong>Website:</strong>{" "}
       {selectedNode.website && selectedNode.website !== "" ? (
@@ -1976,9 +2112,31 @@ return (
         ) : (
         ""
       )}</p>
+      {storedProfile?.verified && storedProfile.bio && (
+        <div style={{ marginTop: '12px', fontSize: '14px', lineHeight: 1.5, textAlign: 'left' }}>
+          <p>{storedProfile.bio}</p>
+          {storedProfile.craftStatement && <p><em>{storedProfile.craftStatement}</em></p>}
+        </div>
+      )}
       </>
     )}
     </div>
+  )}
+
+  {(showProfileModal || isGeneratingProfile) && (
+    <ProfileReviewModal
+      person={editedNode ? buildPersonPayload(editedNode) : null}
+      profile={generatedProfile}
+      isGenerating={isGeneratingProfile || isSavingNode}
+      error={profileError}
+      onConfirm={handleConfirmProfile}
+      onSaveEdited={handleSaveEditedProfile}
+      onSkip={handleSkipProfile}
+      onRegenerate={handleRegenerateProfile}
+      onClose={() => {
+        if (!isGeneratingProfile && !isSavingNode) closeProfileFlow();
+      }}
+    />
   )}
   </div>
   );

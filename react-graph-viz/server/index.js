@@ -9,6 +9,7 @@ import {
   normalizeCypher,
   classifyQueryIntent,
 } from '../src/llmShared.js';
+import { enrichPersonProfile } from '../src/profileEnrichment.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -61,11 +62,30 @@ app.get('/', (req, res) => {
     service: 'craft-network-llm-proxy',
     health: '/api/health',
     generateCypher: 'POST /api/generate-cypher',
+    generateProfile: 'POST /api/generate-profile',
   });
 });
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, service: 'craft-network-llm-proxy' });
+});
+
+app.post('/api/generate-profile', async (req, res) => {
+  try {
+    const { person } = req.body || {};
+    if (!person?.name?.trim()) {
+      return res.status(400).json({ error: 'Missing person.name' });
+    }
+    const llmConfig = getServerProviderConfig();
+    const profile = await enrichPersonProfile(person, {
+      apiKey: llmConfig.apiKey,
+      model: llmConfig.model,
+    });
+    res.json({ profile, source: llmConfig.provider });
+  } catch (error) {
+    console.error('generate-profile error:', error);
+    res.status(500).json({ error: error.message || 'Profile generation failed' });
+  }
 });
 
 app.post('/api/generate-cypher', async (req, res) => {
