@@ -1,22 +1,22 @@
 {
   "files": {
-    "main.css": "/craft-network/static/css/main.01b6fc35.chunk.css",
-    "main.js": "/craft-network/static/js/main.f9a45cfc.chunk.js",
-    "main.js.map": "/craft-network/static/js/main.f9a45cfc.chunk.js.map",
+    "main.css": "/craft-network/static/css/main.ead59979.chunk.css",
+    "main.js": "/craft-network/static/js/main.f3c0b52d.chunk.js",
+    "main.js.map": "/craft-network/static/js/main.f3c0b52d.chunk.js.map",
     "runtime-main.js": "/craft-network/static/js/runtime-main.ad10f8df.js",
     "runtime-main.js.map": "/craft-network/static/js/runtime-main.ad10f8df.js.map",
-    "static/js/2.f1d14816.chunk.js": "/craft-network/static/js/2.f1d14816.chunk.js",
-    "static/js/2.f1d14816.chunk.js.map": "/craft-network/static/js/2.f1d14816.chunk.js.map",
+    "static/js/2.5a58ba1d.chunk.js": "/craft-network/static/js/2.5a58ba1d.chunk.js",
+    "static/js/2.5a58ba1d.chunk.js.map": "/craft-network/static/js/2.5a58ba1d.chunk.js.map",
     "index.html": "/craft-network/index.html",
-    "precache-manifest.62d724f9e70e0185a676998a5d44ab61.js": "/craft-network/precache-manifest.62d724f9e70e0185a676998a5d44ab61.js",
+    "precache-manifest.752c43270ff962cb4a4827675b2c06ec.js": "/craft-network/precache-manifest.752c43270ff962cb4a4827675b2c06ec.js",
     "service-worker.js": "/craft-network/service-worker.js",
-    "static/css/main.01b6fc35.chunk.css.map": "/craft-network/static/css/main.01b6fc35.chunk.css.map",
-    "static/js/2.f1d14816.chunk.js.LICENSE.txt": "/craft-network/static/js/2.f1d14816.chunk.js.LICENSE.txt"
+    "static/css/main.ead59979.chunk.css.map": "/craft-network/static/css/main.ead59979.chunk.css.map",
+    "static/js/2.5a58ba1d.chunk.js.LICENSE.txt": "/craft-network/static/js/2.5a58ba1d.chunk.js.LICENSE.txt"
   },
   "entrypoints": [
     "static/js/runtime-main.ad10f8df.js",
-    "static/js/2.f1d14816.chunk.js",
-    "static/css/main.01b6fc35.chunk.css",
-    "static/js/main.f9a45cfc.chunk.js"
+    "static/js/2.5a58ba1d.chunk.js",
+    "static/css/main.ead59979.chunk.css",
+    "static/js/main.f3c0b52d.chunk.js"
   ]
 }
