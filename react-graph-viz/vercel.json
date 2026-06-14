@@ -1,12 +1,13 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "echo 'API-only deploy — skipping yarn install'",
+  "buildCommand": "echo 'API-only deploy — skipping CRA build'",
+  "outputDirectory": "public",
   "functions": {
     "api/**/*.js": {
       "memory": 256,
       "maxDuration": 30
     }
-  },
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
-  ]
+  }
 }
