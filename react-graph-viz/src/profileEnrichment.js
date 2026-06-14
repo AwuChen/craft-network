@@ -93,22 +93,38 @@ function pickSuggestedWebsite(sources, person) {
   return best || sources[0]?.url || '';
 }
 
-export async function searchWebSources(person, tavilyApiKey) {
-  if (!tavilyApiKey) return [];
+function dedupeSources(sources) {
+  const seen = new Set();
+  return sources.filter((source) => {
+    if (!source?.url || seen.has(source.url)) return false;
+    seen.add(source.url);
+    return true;
+  });
+}
 
-  const query = [`"${person.name}"`, person.role, person.location, 'artist craftsman']
-    .filter(Boolean)
-    .join(' ');
+function buildSearchQueries(person) {
+  const { name, role, location } = person;
+  const queries = [
+    `${name} ${role} ${location}`.trim(),
+    `"${name}" ${role} ${location}`.trim(),
+    `${name} ${role} artist ${location}`.trim(),
+    `${name} craftsman ${location}`.trim(),
+  ];
+  return [...new Set(queries.filter(Boolean))];
+}
 
+async function runTavilySearch(query, tavilyApiKey, options = {}) {
   const response = await fetch('https://api.tavily.com/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       api_key: tavilyApiKey,
       query,
-      search_depth: 'basic',
-      max_results: 5,
-      include_answer: false,
+      search_depth: options.advanced ? 'advanced' : 'basic',
+      max_results: options.maxResults || 5,
+      include_answer: Boolean(options.includeAnswer),
+      include_images: Boolean(options.includeImages),
+      include_image_descriptions: Boolean(options.includeImages),
     }),
   });
 
@@ -117,13 +133,48 @@ export async function searchWebSources(person, tavilyApiKey) {
     throw new Error(err.detail || err.error || `Web search failed (${response.status})`);
   }
 
-  const data = await response.json();
+  return response.json();
+}
+
+function mapTavilyResults(data) {
   return (data.results || []).map((result) => ({
     title: result.title || result.url,
     url: result.url,
     snippet: result.content || '',
     images: result.images || [],
   }));
+}
+
+export async function searchWebSources(person, tavilyApiKey) {
+  if (!tavilyApiKey) {
+    return { sources: [], status: 'missing_api_key', answer: '' };
+  }
+
+  const queries = buildSearchQueries(person);
+  let answer = '';
+  const batches = await Promise.all(
+    queries.map(async (query, index) => {
+      try {
+        const data = await runTavilySearch(query, tavilyApiKey, {
+          advanced: true,
+          maxResults: 5,
+          includeAnswer: index === 0,
+        });
+        if (index === 0 && data.answer) answer = data.answer;
+        return mapTavilyResults(data);
+      } catch (err) {
+        console.warn(`Tavily query failed (${query}):`, err.message);
+        return [];
+      }
+    }),
+  );
+
+  const sources = dedupeSources(batches.flat());
+  return {
+    sources,
+    status: sources.length ? 'ok' : 'no_results',
+    answer,
+  };
 }
 
 function normalizeImageUrl(url) {
@@ -165,58 +216,48 @@ function collectImagesFromSearch(data, defaultCaption) {
 export async function searchArtistImages(person, tavilyApiKey) {
   if (!tavilyApiKey) return [];
 
-  const query = `"${person.name}" ${person.role} ${person.location} artist portrait photo`.trim();
-  const response = await fetch('https://api.tavily.com/search', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      api_key: tavilyApiKey,
-      query,
-      search_depth: 'basic',
-      max_results: 4,
-      include_images: true,
-      include_image_descriptions: true,
-    }),
-  });
-
-  if (!response.ok) return [];
-
-  const data = await response.json();
-  return collectImagesFromSearch(data, person.name).slice(0, 3);
+  const query = `"${person.name}" ${person.role} ${person.location}`.trim();
+  try {
+    const data = await runTavilySearch(query, tavilyApiKey, {
+      advanced: true,
+      maxResults: 4,
+      includeImages: true,
+    });
+    return collectImagesFromSearch(data, person.name).slice(0, 3);
+  } catch (_) {
+    return [];
+  }
 }
 
 export async function searchArtworkImages(person, tavilyApiKey) {
   if (!tavilyApiKey) return [];
 
-  const query = `"${person.name}" ${person.role} artwork craft piece work`.trim();
-  const response = await fetch('https://api.tavily.com/search', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      api_key: tavilyApiKey,
-      query,
-      search_depth: 'basic',
-      max_results: 5,
-      include_images: true,
-      include_image_descriptions: true,
-    }),
-  });
-
-  if (!response.ok) return [];
-
-  const data = await response.json();
-  return collectImagesFromSearch(data, `${person.name} — ${person.role}`).slice(0, 6);
+  const query = `"${person.name}" ${person.role} artwork craft`.trim();
+  try {
+    const data = await runTavilySearch(query, tavilyApiKey, {
+      advanced: true,
+      maxResults: 5,
+      includeImages: true,
+    });
+    return collectImagesFromSearch(data, `${person.name} — ${person.role}`).slice(0, 6);
+  } catch (_) {
+    return [];
+  }
 }
 
-function buildProfilePrompt(person, searchSources) {
+function buildProfilePrompt(person, searchSources, searchAnswer = '') {
   const sourceBlock = searchSources.length
     ? searchSources
         .map(
           (s, i) =>
-            `[${i}] ${s.title}\n    URL: ${s.url}\n    Excerpt: ${s.snippet.slice(0, 280)}`,
+            `[${i}] ${s.title}\n    URL: ${s.url}\n    Excerpt: ${s.snippet.slice(0, 400)}`,
         )
         .join('\n\n')
     : '(No web sources found — write minimal copy and set needsMoreInfo true.)';
+
+  const answerBlock = searchAnswer
+    ? `\nSearch summary (cross-check against source excerpts):\n${searchAnswer}\n`
+    : '';
 
   return `You write profile pages for the Craft Network — a graph of craftsmen, artists, and collaborators.
 
@@ -228,6 +269,7 @@ Person (from NFC onboarding):
 
 Web search results — ONLY use these for factual biographical claims:
 ${sourceBlock}
+${answerBlock}
 
 Respond with JSON only:
 {
@@ -279,7 +321,7 @@ async function callOpenAI(prompt, config) {
   return data.choices?.[0]?.message?.content || '';
 }
 
-export function normalizeProfile(parsed, person, searchSources = []) {
+export function normalizeProfile(parsed, person, searchSources = [], searchStatus = 'ok') {
   const fieldScore = scorePersonMatchConfidence(person);
   const usedIndices = Array.isArray(parsed.usedSourceIndices)
     ? parsed.usedSourceIndices.filter((i) => Number.isInteger(i) && searchSources[i])
@@ -312,6 +354,8 @@ export function normalizeProfile(parsed, person, searchSources = []) {
     '';
 
   const needsMoreInfo =
+    searchStatus === 'missing_api_key' ||
+    searchStatus === 'no_results' ||
     Boolean(parsed.needsMoreInfo) ||
     (citedSources.length === 0 && !person.website && searchSources.length === 0);
 
@@ -321,7 +365,12 @@ export function normalizeProfile(parsed, person, searchSources = []) {
 
   return {
     confidence,
-    matchSummary: parsed.matchSummary || '',
+    matchSummary:
+      searchStatus === 'missing_api_key'
+        ? 'Web search is not configured — set TAVILY_API_KEY on Render to look up artists like Google does.'
+        : searchStatus === 'no_results'
+          ? 'No matching public sources were found for this name and craft.'
+          : parsed.matchSummary || '',
     tagline: parsed.tagline || '',
     bio: parsed.bio || '',
     craftStatement: parsed.craftStatement || '',
@@ -331,9 +380,33 @@ export function normalizeProfile(parsed, person, searchSources = []) {
     citedSources: citedSources.map((s) => ({ title: s.title, url: s.url, snippet: s.snippet })),
     suggestedWebsite,
     searchPerformed: searchSources.length > 0,
+    searchStatus,
     artistImages: [],
     artworkImages: [],
   };
+}
+
+function buildMissingSearchProfile(person) {
+  return attachImagesToProfile(
+    {
+      confidence: 0.1,
+      matchSummary:
+        'Web search is not configured — set TAVILY_API_KEY on Render to look up artists like Google does.',
+      tagline: '',
+      bio:
+        'This profile could not be verified against the web. Add TAVILY_API_KEY to the Render proxy (craft-network-llm), then regenerate — or paste the artist\'s website manually below.',
+      craftStatement: person.role ? `${person.name} works in ${person.role}.` : '',
+      highlights: [],
+      needsMoreInfo: true,
+      sources: [],
+      citedSources: [],
+      suggestedWebsite: person.website || '',
+      searchPerformed: false,
+      searchStatus: 'missing_api_key',
+    },
+    [],
+    [],
+  );
 }
 
 export function attachImagesToProfile(profile, artistImages, artworkImages) {
@@ -356,17 +429,22 @@ export async function enrichPersonProfile(person, llmConfig) {
     throw new Error('Name is required to generate a profile');
   }
 
-  const searchSources = await searchWebSources(trimmed, llmConfig.tavilyApiKey).catch((err) => {
-    console.warn('Web search skipped:', err.message);
-    return [];
-  });
+  const searchResult = await searchWebSources(trimmed, llmConfig.tavilyApiKey);
+  const { sources: searchSources, status: searchStatus, answer: searchAnswer } = searchResult;
+
+  if (searchStatus === 'missing_api_key') {
+    return buildMissingSearchProfile(trimmed);
+  }
 
   const [artistImages, artworkImages] = await Promise.all([
     searchArtistImages(trimmed, llmConfig.tavilyApiKey).catch(() => []),
     searchArtworkImages(trimmed, llmConfig.tavilyApiKey).catch(() => []),
   ]);
 
-  const raw = await callOpenAI(buildProfilePrompt(trimmed, searchSources), llmConfig);
-  const profile = normalizeProfile(parseProfileJson(raw), trimmed, searchSources);
+  const raw = await callOpenAI(
+    buildProfilePrompt(trimmed, searchSources, searchAnswer),
+    llmConfig,
+  );
+  const profile = normalizeProfile(parseProfileJson(raw), trimmed, searchSources, searchStatus);
   return attachImagesToProfile(profile, artistImages, artworkImages);
 }

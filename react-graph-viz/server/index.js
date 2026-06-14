@@ -67,7 +67,11 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, service: 'craft-network-llm-proxy' });
+  res.json({
+    ok: true,
+    service: 'craft-network-llm-proxy',
+    tavilyConfigured: Boolean(process.env.TAVILY_API_KEY),
+  });
 });
 
 app.post('/api/generate-profile', async (req, res) => {
