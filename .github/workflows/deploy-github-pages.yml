@@ -41,6 +41,8 @@ jobs:
       - name: Build with production env
         run: npm run build
         env:
+          # react-scripts 3.x + webpack 4 need legacy OpenSSL on Node 17+
+          NODE_OPTIONS: --openssl-legacy-provider
           # LLM — set REACT_APP_OPENAI_API_KEY (and optionally ANTHROPIC) in repo Secrets
           REACT_APP_LLM_PROVIDER: ${{ secrets.REACT_APP_LLM_PROVIDER }}
           REACT_APP_OPENAI_API_KEY: ${{ secrets.REACT_APP_OPENAI_API_KEY }}
