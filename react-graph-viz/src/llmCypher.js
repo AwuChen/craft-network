@@ -177,7 +177,7 @@ function getProviderConfig() {
     return {
       provider: 'anthropic',
       apiKey,
-      model: process.env.REACT_APP_ANTHROPIC_MODEL || 'claude-sonnet-4-20250514',
+      model: process.env.REACT_APP_ANTHROPIC_MODEL || 'claude-3-5-haiku-20241022',
     };
   }
 
@@ -188,7 +188,7 @@ function getProviderConfig() {
   return {
     provider: 'openai',
     apiKey,
-    model: process.env.REACT_APP_OPENAI_MODEL || 'gpt-4o',
+    model: process.env.REACT_APP_OPENAI_MODEL || 'gpt-4o-mini',
   };
 }
 

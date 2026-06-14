@@ -1,0 +1,63 @@
+name: Deploy Craft Network to GitHub Pages
+
+on:
+  push:
+    branches:
+      - 0818-CraftNetworkUpdate
+      - master
+    paths:
+      - 'react-graph-viz/**'
+      - '.github/workflows/deploy-github-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy-github-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: react-graph-viz
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: react-graph-viz/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build with production env
+        run: npm run build
+        env:
+          # LLM — set REACT_APP_OPENAI_API_KEY (and optionally ANTHROPIC) in repo Secrets
+          REACT_APP_LLM_PROVIDER: ${{ secrets.REACT_APP_LLM_PROVIDER }}
+          REACT_APP_OPENAI_API_KEY: ${{ secrets.REACT_APP_OPENAI_API_KEY }}
+          REACT_APP_OPENAI_MODEL: gpt-4o-mini
+          REACT_APP_ANTHROPIC_API_KEY: ${{ secrets.REACT_APP_ANTHROPIC_API_KEY }}
+          REACT_APP_ANTHROPIC_MODEL: claude-3-5-haiku-20241022
+          # Optional Neo4j overrides (falls back to values in src/index.js if unset)
+          REACT_APP_NEO4J_URI: ${{ secrets.NEO4J_URI }}
+          REACT_APP_NEO4J_USER: ${{ secrets.NEO4J_USER }}
+          REACT_APP_NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
+
+      - name: Deploy to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./react-graph-viz/build
+          publish_branch: gh-pages
+          user_name: github-actions[bot]
+          user_email: github-actions[bot]@users.noreply.github.com
+          commit_message: 'Deploy Craft Network from ${{ github.sha }}'
