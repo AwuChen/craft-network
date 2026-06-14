@@ -41,18 +41,9 @@ jobs:
       - name: Build with production env
         run: npm run build
         env:
-          # react-scripts 3.x + webpack 4 need legacy OpenSSL on Node 17+
           NODE_OPTIONS: --openssl-legacy-provider
-          # LLM — set REACT_APP_OPENAI_API_KEY (and optionally ANTHROPIC) in repo Secrets
-          REACT_APP_LLM_PROVIDER: ${{ secrets.REACT_APP_LLM_PROVIDER }}
-          REACT_APP_OPENAI_API_KEY: ${{ secrets.REACT_APP_OPENAI_API_KEY }}
-          REACT_APP_OPENAI_MODEL: gpt-4o-mini
-          REACT_APP_ANTHROPIC_API_KEY: ${{ secrets.REACT_APP_ANTHROPIC_API_KEY }}
-          REACT_APP_ANTHROPIC_MODEL: claude-3-5-haiku-20241022
-          # Optional Neo4j overrides (falls back to values in src/index.js if unset)
-          REACT_APP_NEO4J_URI: ${{ secrets.NEO4J_URI }}
-          REACT_APP_NEO4J_USER: ${{ secrets.NEO4J_USER }}
-          REACT_APP_NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
+          # Proxy URL only — never bake API keys into the static bundle (GitHub push protection blocks them)
+          REACT_APP_LLM_PROXY_URL: ${{ vars.REACT_APP_LLM_PROXY_URL }}
 
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
