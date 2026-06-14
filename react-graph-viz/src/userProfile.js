@@ -14,16 +14,56 @@ export function formatCraftForDisplay(node) {
   return role || title;
 }
 
+export function profilePathForName(name) {
+  return `/profile/${encodeURIComponent(name)}`;
+}
+
+function parseJsonField(raw, fallback = []) {
+  try {
+    return JSON.parse(raw || JSON.stringify(fallback));
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function mapProfileRecord(record) {
+  return {
+    tagline: record.get('tagline'),
+    bio: record.get('bio'),
+    craftStatement: record.get('craftStatement'),
+    highlights: parseJsonField(record.get('highlights')),
+    profileSources: parseJsonField(record.get('profileSources')),
+    artistImages: parseJsonField(record.get('artistImages')),
+    artworkImages: parseJsonField(record.get('artworkImages')),
+    confidence: record.get('confidence'),
+    verified: record.get('verified'),
+    matchSummary: record.get('matchSummary'),
+  };
+}
+
 export async function fetchUserProfile(driver, name) {
+  const full = await fetchFullUserProfile(driver, name);
+  if (!full) return null;
+  return full.profile;
+}
+
+export async function fetchFullUserProfile(driver, name) {
   const session = driver.session();
   try {
     const result = await session.run(
       `MATCH (u:User {name: $name})
-       RETURN coalesce(u.title, '') AS title,
+       RETURN u.name AS name,
+              coalesce(u.role, '') AS role,
+              coalesce(u.title, '') AS title,
+              coalesce(u.location, '') AS location,
+              coalesce(u.website, '') AS website,
               coalesce(u.profileTagline, '') AS tagline,
               coalesce(u.profileBio, '') AS bio,
               coalesce(u.profileCraftStatement, '') AS craftStatement,
               coalesce(u.profileHighlights, '[]') AS highlights,
+              coalesce(u.profileSources, '[]') AS profileSources,
+              coalesce(u.profileArtistImages, '[]') AS artistImages,
+              coalesce(u.profileArtworkImages, '[]') AS artworkImages,
               coalesce(u.profileConfidence, 0.0) AS confidence,
               coalesce(u.profileVerified, false) AS verified,
               coalesce(u.profileMatchSummary, '') AS matchSummary`,
@@ -33,22 +73,17 @@ export async function fetchUserProfile(driver, name) {
     if (result.records.length === 0) return null;
 
     const record = result.records[0];
-    let highlights = [];
-    try {
-      highlights = JSON.parse(record.get('highlights') || '[]');
-    } catch (_) {
-      highlights = [];
-    }
-
     return {
+      name: record.get('name'),
+      role: record.get('role'),
       title: record.get('title'),
-      tagline: record.get('tagline'),
-      bio: record.get('bio'),
-      craftStatement: record.get('craftStatement'),
-      highlights,
-      confidence: record.get('confidence'),
-      verified: record.get('verified'),
-      matchSummary: record.get('matchSummary'),
+      location: record.get('location'),
+      website: record.get('website'),
+      craft: formatCraftForDisplay({
+        role: record.get('role'),
+        title: record.get('title'),
+      }),
+      profile: mapProfileRecord(record),
     };
   } finally {
     await session.close();
@@ -77,6 +112,9 @@ export async function saveUserWithProfile(driver, {
            u.profileBio = $bio,
            u.profileCraftStatement = $craftStatement,
            u.profileHighlights = $highlights,
+           u.profileSources = $profileSources,
+           u.profileArtistImages = $artistImages,
+           u.profileArtworkImages = $artworkImages,
            u.profileConfidence = $confidence,
            u.profileMatchSummary = $matchSummary,
            u.profileVerified = $verified,
@@ -91,6 +129,9 @@ export async function saveUserWithProfile(driver, {
         bio: profile?.bio || '',
         craftStatement: profile?.craftStatement || '',
         highlights: JSON.stringify(profile?.highlights || []),
+        profileSources: JSON.stringify(profile?.citedSources || profile?.sources || []),
+        artistImages: JSON.stringify(profile?.artistImages || []),
+        artworkImages: JSON.stringify(profile?.artworkImages || []),
         confidence: profile?.confidence ?? 0,
         matchSummary: profile?.matchSummary || '',
         verified: Boolean(verified),

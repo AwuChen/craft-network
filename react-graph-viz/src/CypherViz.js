@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { HashRouter as Router, Route, Routes, useLocation, useParams } from 'react-router-dom';
+import { HashRouter as Router, Route, Routes, useLocation, useParams, useNavigate } from 'react-router-dom';
 import './App.css';
 import ForceGraph2D from 'react-force-graph-2d';
 import * as d3 from 'd3';
 import { generateCypherFromNaturalLanguage } from './llmCypher';
 import { generatePersonProfile } from './llmProfile';
-import { fetchUserProfile, saveUserWithProfile, saveUserFieldsOnly, formatCraftForDisplay } from './userProfile';
+import { fetchUserProfile, saveUserWithProfile, saveUserFieldsOnly, formatCraftForDisplay, profilePathForName } from './userProfile';
 import ProfileReviewModal from './ProfileReviewModal';
+import ArtistProfilePage from './ArtistProfilePage';
 import { fetchLiveRoster } from './craftNetworkData';
 import { startNeo4jKeepAlive } from './neo4jKeepAlive';
 
@@ -1033,6 +1034,7 @@ class CypherViz extends React.Component {
       <Router>
       <div>
       <Routes>
+      <Route path="/profile/:profileName" element={<ArtistProfilePage driver={this.driver} />} />
       <Route path="/:username" element={<NFCTrigger addNode={this.addNodeNFC} />} />
       <Route path="/" element={
         <GraphView 
@@ -1088,6 +1090,7 @@ const NFCTrigger = ({ addNode }) => {
       };
 
               const GraphView = ({ data, handleChange, loadData, fgRef, latestNode, pollingFocusNode, driver, processingMutation, updateUserActivity, isUserActive, scaleTransitionStart, scaleTransitionDuration }) => {
+        const navigate = useNavigate();
         const [inputValue, setInputValue] = useState(""); 
         const [selectedNode, setSelectedNode] = useState(null);
         const [editedNode, setEditedNode] = useState(null);
@@ -1540,21 +1543,30 @@ const NFCTrigger = ({ addNode }) => {
           }
         };
 
-        const handleNodeClick = (node) => {
+        const handleNodeClick = async (node) => {
           if (!node) return;
+
+          if (node.name !== latestNode) {
+            try {
+              const profile = await fetchUserProfile(driver, node.name);
+              if (profile?.verified) {
+                navigate(profilePathForName(node.name));
+                return;
+              }
+            } catch (err) {
+              console.warn('Profile lookup failed:', err);
+            }
+          }
+
           setSelectedNode(node);
           setEditedNode(buildEditedNodeState(node));
           setFocusNode(node.name);
           setClickedNode(node.name);
           setLastAction('click');
           
-          // Update user activity when clicking nodes
           updateUserActivity();
-          
-          // Clear search when clicking a node to avoid zoom conflicts
           setInputValue("");
           
-          // Reset any existing focus timeouts to prevent conflicts
           if (window.focusTimeout) {
             clearTimeout(window.focusTimeout);
           }
@@ -1567,12 +1579,15 @@ const NFCTrigger = ({ addNode }) => {
           setIsGeneratingProfile(false);
         };
 
-        const persistNode = async (profile, verified) => {
+        const persistNode = async (profile, verified, websiteOverride) => {
           if (!editedNode || !selectedNode) return;
 
           setIsSavingNode(true);
           try {
-            const person = buildPersonPayload(editedNode);
+            const person = buildPersonPayload({
+              ...editedNode,
+              website: websiteOverride || editedNode.website,
+            });
             if (profile && verified) {
               await saveUserWithProfile(driver, {
                 oldName: selectedNode.name,
@@ -1589,6 +1604,9 @@ const NFCTrigger = ({ addNode }) => {
             await loadData(person.name);
             closeProfileFlow();
             setSelectedNode(null);
+            if (profile && verified) {
+              navigate(profilePathForName(person.name));
+            }
           } catch (error) {
             console.error("Error saving node:", error);
             setProfileError(error.message || 'Failed to save');
@@ -1620,8 +1638,8 @@ const NFCTrigger = ({ addNode }) => {
           }
         };
 
-        const handleConfirmProfile = (profile) => persistNode(profile, true);
-        const handleSaveEditedProfile = (profile) => persistNode(profile, true);
+        const handleConfirmProfile = (profile, website) => persistNode(profile, true, website);
+        const handleSaveEditedProfile = (profile, website) => persistNode(profile, true, website);
         const handleSkipProfile = () => persistNode(null, false);
 
         const handleRegenerateProfile = async () => {
@@ -2098,25 +2116,17 @@ return (
       <h3>Network Info</h3>
       <p><strong>Name:</strong> {selectedNode?.name}</p>
       <p><strong>Craft:</strong> {formatCraftForDisplay(selectedNode)}</p>
-      {storedProfile?.tagline && storedProfile.verified && (
-        <p style={{ fontStyle: 'italic' }}>{storedProfile.tagline}</p>
-      )}
-      <p><strong>Location:</strong> {selectedNode?.location}</p>
-      <p><strong>Website:</strong>{" "}
-      {selectedNode.website && selectedNode.website !== "" ? (
-        <a href={selectedNode.website} target="_blank" rel="noopener noreferrer">
-        {selectedNode.website.length > 30 
-          ? `${selectedNode.website.substring(0, 30)}...`
-        : selectedNode.website}
-        </a>
-        ) : (
-        ""
-      )}</p>
-      {storedProfile?.verified && storedProfile.bio && (
-        <div style={{ marginTop: '12px', fontSize: '14px', lineHeight: 1.5, textAlign: 'left' }}>
-          <p>{storedProfile.bio}</p>
-          {storedProfile.craftStatement && <p><em>{storedProfile.craftStatement}</em></p>}
-        </div>
+      <p><strong>Location:</strong> {selectedNode?.location || '—'}</p>
+      {storedProfile?.verified ? (
+        <p style={{ marginTop: '12px' }}>
+          <button type="button" onClick={() => navigate(profilePathForName(selectedNode.name))}>
+            View full profile →
+          </button>
+        </p>
+      ) : (
+        <p style={{ fontSize: '14px', color: '#666', marginTop: '12px' }}>
+          No verified profile yet.
+        </p>
       )}
       </>
     )}

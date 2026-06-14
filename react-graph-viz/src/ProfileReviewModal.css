@@ -147,6 +147,123 @@
   padding: 8px;
 }
 
+.profile-website-section {
+  margin: 16px 0;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #d8cbb8;
+}
+
+.profile-website-section label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.profile-website-section input {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  box-sizing: border-box;
+  border: 1px solid #c8b8a8;
+  padding: 8px;
+}
+
+.profile-use-website {
+  margin-top: 8px;
+  background: transparent;
+  border: 1px dashed #8a7560;
+  color: #5c5048;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.profile-website-preview {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #2f5c40;
+}
+
+.profile-sources-section {
+  margin: 16px 0;
+}
+
+.profile-sources-section h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8a7560;
+}
+
+.profile-source-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.profile-source-list li {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #d8cbb8;
+}
+
+.profile-source-list li.cited {
+  border-color: #2f5c40;
+  box-shadow: inset 3px 0 0 #2f5c40;
+}
+
+.profile-source-list a {
+  color: #2a2420;
+  font-weight: 600;
+}
+
+.profile-source-badge {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 11px;
+  color: #2f5c40;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.profile-source-snippet {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #6a5c50;
+}
+
+.profile-images-preview {
+  margin: 16px 0;
+}
+
+.profile-images-preview h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a7560;
+}
+
+.profile-image-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin-bottom: 12px;
+}
+
+.profile-image-row img {
+  width: 88px;
+  height: 88px;
+  object-fit: cover;
+  border: 1px solid #d8cbb8;
+  flex-shrink: 0;
+}
+
 .profile-modal-loading,
 .profile-modal-error {
   text-align: center;

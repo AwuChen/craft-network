@@ -80,6 +80,7 @@ app.post('/api/generate-profile', async (req, res) => {
     const profile = await enrichPersonProfile(person, {
       apiKey: llmConfig.apiKey,
       model: llmConfig.model,
+      tavilyApiKey: process.env.TAVILY_API_KEY,
     });
     res.json({ profile, source: llmConfig.provider });
   } catch (error) {
