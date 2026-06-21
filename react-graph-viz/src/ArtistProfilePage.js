@@ -61,7 +61,6 @@ export default function ArtistProfilePage({ driver }) {
 
   const { profile } = person;
   const portrait = profile?.artistImages?.[0];
-  const artworks = profile?.artworkImages || [];
   const sources = profile?.profileSources || [];
   const website = person.website?.startsWith('http') ? person.website : person.website ? `https://${person.website}` : '';
 
@@ -109,25 +108,6 @@ export default function ArtistProfilePage({ driver }) {
           )}
         </section>
       </div>
-
-      {artworks.length > 0 && (
-        <section className="artist-profile-gallery">
-          <h2>Selected works</h2>
-          <div className="artist-gallery-grid">
-            {artworks.map((work) => (
-              <figure key={work.url} className="artist-gallery-item">
-                <img src={work.url} alt={work.caption || 'Artwork'} loading="lazy" />
-                {work.caption && <figcaption>{work.caption}</figcaption>}
-                {work.sourceUrl && (
-                  <a href={work.sourceUrl} target="_blank" rel="noopener noreferrer" className="artist-gallery-source">
-                    Source ↗
-                  </a>
-                )}
-              </figure>
-            ))}
-          </div>
-        </section>
-      )}
 
       {sources.length > 0 && (
         <section className="artist-profile-sources">

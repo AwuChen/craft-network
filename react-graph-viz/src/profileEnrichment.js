@@ -159,8 +159,7 @@ After searching, respond with JSON only (no markdown fences):
   "craftStatement": "one sentence about their craft",
   "highlights": ["2-4 bullets supported by sources"],
   "needsMoreInfo": true or false,
-  "artistImages": [{"url":"https://...","caption":"","sourceUrl":""}],
-  "artworkImages": [{"url":"https://...","caption":"","sourceUrl":""}]
+  "portraitImage": {"url":"https://...","caption":"","sourceUrl":""} or null
 }
 
 Rules:
@@ -168,7 +167,7 @@ Rules:
 - If sources do not clearly match this person, set needsMoreInfo true and confidence below 0.45
 - Do NOT invent awards, employers, exhibitions, or quotes not found in search
 - suggestedWebsite should be their own site when visible; avoid social media
-- artistImages: up to 3 portrait photos; artworkImages: up to 6 work samples with direct image URLs when found`;
+- portraitImage: at most one headshot or portrait photo URL from search; use null if none found`;
 }
 
 function extractResponseText(data) {
@@ -271,6 +270,7 @@ async function callOpenAIWithWebSearch(person, config) {
       tools: [{ type: 'web_search' }],
       tool_choice: 'required',
       include: ['web_search_call.action.sources'],
+      text: { format: { type: 'json_object' } },
       input: [
         {
           role: 'system',
@@ -434,12 +434,10 @@ export async function enrichPersonProfile(person, llmConfig) {
     searchPerformed,
   );
 
-  const artistImages = normalizeProfileImages(parsed.artistImages, trimmed.name, 3);
-  const artworkImages = normalizeProfileImages(
-    parsed.artworkImages,
-    `${trimmed.name} — ${trimmed.role}`,
-    6,
-  );
+  const portraitInput = parsed.portraitImage
+    ? [parsed.portraitImage]
+    : parsed.artistImages;
+  const artistImages = normalizeProfileImages(portraitInput, trimmed.name, 1);
 
-  return attachImagesToProfile(profile, artistImages, artworkImages);
+  return attachImagesToProfile(profile, artistImages, []);
 }

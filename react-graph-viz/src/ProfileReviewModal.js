@@ -145,28 +145,16 @@ export default function ProfileReviewModal({
               </p>
             )}
 
-            {(draft.artistImages?.length > 0 || draft.artworkImages?.length > 0) && (
+            {draft.artistImages?.[0] && (
               <div className="profile-images-preview">
-                {draft.artistImages?.length > 0 && (
-                  <div>
-                    <h3>Artist</h3>
-                    <div className="profile-image-row">
-                      {draft.artistImages.map((img) => (
-                        <img key={img.url} src={img.url} alt={img.caption || person.name} loading="lazy" />
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {draft.artworkImages?.length > 0 && (
-                  <div>
-                    <h3>Works</h3>
-                    <div className="profile-image-row">
-                      {draft.artworkImages.map((img) => (
-                        <img key={img.url} src={img.url} alt={img.caption || 'Artwork'} loading="lazy" />
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <h3>Portrait</h3>
+                <div className="profile-image-row">
+                  <img
+                    src={draft.artistImages[0].url}
+                    alt={draft.artistImages[0].caption || person.name}
+                    loading="lazy"
+                  />
+                </div>
               </div>
             )}
 

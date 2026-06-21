@@ -90,8 +90,7 @@ function profileStats(profile) {
   const cited = profile?.citedSources?.length
     ?? sources.filter((s) => s.cited).length
     ?? sources.length;
-  const images =
-    (profile?.artistImages?.length || 0) + (profile?.artworkImages?.length || 0);
+  const images = profile?.artistImages?.length > 0 ? 1 : 0;
   return {
     confidence: Number(profile?.confidence || 0),
     sources: sources.length,
@@ -157,8 +156,7 @@ async function fetchBaselineProfiles(driver, limit) {
           sources,
           citedSources: sources,
           bio: r.get('bio'),
-          artistImages: parseJsonField(r.get('artistImages')),
-          artworkImages: parseJsonField(r.get('artworkImages')),
+          artistImages: parseJsonField(r.get('artistImages')).slice(0, 1),
           searchStatus: 'stored',
         }),
       };
