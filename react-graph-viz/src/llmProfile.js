@@ -8,7 +8,7 @@ function getLocalLlmConfig() {
   return {
     apiKey,
     model: process.env.REACT_APP_OPENAI_MODEL || 'gpt-4o-mini',
-    tavilyApiKey: process.env.REACT_APP_TAVILY_API_KEY,
+    profileModel: process.env.REACT_APP_OPENAI_PROFILE_MODEL,
   };
 }
 

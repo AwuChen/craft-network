@@ -70,7 +70,8 @@ app.get('/api/health', (req, res) => {
   res.json({
     ok: true,
     service: 'craft-network-llm-proxy',
-    tavilyConfigured: Boolean(process.env.TAVILY_API_KEY),
+    webSearch: 'openai-native',
+    openaiConfigured: Boolean(process.env.OPENAI_API_KEY),
   });
 });
 
@@ -80,13 +81,16 @@ app.post('/api/generate-profile', async (req, res) => {
     if (!person?.name?.trim()) {
       return res.status(400).json({ error: 'Missing person.name' });
     }
-    const llmConfig = getServerProviderConfig();
+    const openaiKey = process.env.OPENAI_API_KEY;
+    if (!openaiKey) {
+      return res.status(500).json({ error: 'Missing OPENAI_API_KEY for profile web search' });
+    }
     const profile = await enrichPersonProfile(person, {
-      apiKey: llmConfig.apiKey,
-      model: llmConfig.model,
-      tavilyApiKey: process.env.TAVILY_API_KEY,
+      apiKey: openaiKey,
+      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      profileModel: process.env.OPENAI_PROFILE_MODEL,
     });
-    res.json({ profile, source: llmConfig.provider });
+    res.json({ profile, source: 'openai' });
   } catch (error) {
     console.error('generate-profile error:', error);
     res.status(500).json({ error: error.message || 'Profile generation failed' });

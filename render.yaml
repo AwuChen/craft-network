@@ -13,5 +13,6 @@ services:
         value: openai
       - key: OPENAI_MODEL
         value: gpt-4o-mini
-      - key: TAVILY_API_KEY
-        sync: false
+      # Optional: override model for profile web search (defaults to OPENAI_MODEL)
+      # - key: OPENAI_PROFILE_MODEL
+      #   value: gpt-4o-mini

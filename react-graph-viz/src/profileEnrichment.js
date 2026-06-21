@@ -1,6 +1,6 @@
 /**
  * Generate artistic profile copy for Craft Network members.
- * Uses Tavily web search when available so profiles cite real sources.
+ * Uses OpenAI Responses API with native web_search (no Tavily).
  */
 
 const GENERIC_NAMES = new Set([
@@ -102,79 +102,13 @@ function dedupeSources(sources) {
   });
 }
 
-function buildSearchQueries(person) {
-  const { name, role, location } = person;
-  const queries = [
-    `${name} ${role} ${location}`.trim(),
-    `"${name}" ${role} ${location}`.trim(),
-    `${name} ${role} artist ${location}`.trim(),
-    `${name} craftsman ${location}`.trim(),
-  ];
-  return [...new Set(queries.filter(Boolean))];
-}
-
-async function runTavilySearch(query, tavilyApiKey, options = {}) {
-  const response = await fetch('https://api.tavily.com/search', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      api_key: tavilyApiKey,
-      query,
-      search_depth: options.advanced ? 'advanced' : 'basic',
-      max_results: options.maxResults || 5,
-      include_answer: Boolean(options.includeAnswer),
-      include_images: Boolean(options.includeImages),
-      include_image_descriptions: Boolean(options.includeImages),
-    }),
-  });
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.detail || err.error || `Web search failed (${response.status})`);
+function normalizeUrlKey(url) {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}`.replace(/\/$/, '').toLowerCase();
+  } catch (_) {
+    return (url || '').replace(/\/$/, '').toLowerCase();
   }
-
-  return response.json();
-}
-
-function mapTavilyResults(data) {
-  return (data.results || []).map((result) => ({
-    title: result.title || result.url,
-    url: result.url,
-    snippet: result.content || '',
-    images: result.images || [],
-  }));
-}
-
-export async function searchWebSources(person, tavilyApiKey) {
-  if (!tavilyApiKey) {
-    return { sources: [], status: 'missing_api_key', answer: '' };
-  }
-
-  const queries = buildSearchQueries(person);
-  let answer = '';
-  const batches = await Promise.all(
-    queries.map(async (query, index) => {
-      try {
-        const data = await runTavilySearch(query, tavilyApiKey, {
-          advanced: true,
-          maxResults: 5,
-          includeAnswer: index === 0,
-        });
-        if (index === 0 && data.answer) answer = data.answer;
-        return mapTavilyResults(data);
-      } catch (err) {
-        console.warn(`Tavily query failed (${query}):`, err.message);
-        return [];
-      }
-    }),
-  );
-
-  const sources = dedupeSources(batches.flat());
-  return {
-    sources,
-    status: sources.length ? 'ok' : 'no_results',
-    answer,
-  };
 }
 
 function normalizeImageUrl(url) {
@@ -184,158 +118,215 @@ function normalizeImageUrl(url) {
   return url;
 }
 
-function collectImagesFromSearch(data, defaultCaption) {
-  const images = [];
-  const seen = new Set();
-
-  const add = (url, caption, sourceUrl) => {
-    const normalized = normalizeImageUrl(url);
-    if (!normalized || seen.has(normalized)) return;
-    seen.add(normalized);
-    images.push({
-      url: normalized,
-      caption: caption || defaultCaption || '',
-      sourceUrl: sourceUrl || '',
-    });
-  };
-
-  for (const result of data.results || []) {
-    for (const img of result.images || []) {
-      if (typeof img === 'string') add(img, result.title, result.url);
-      else if (img?.url) add(img.url, img.description || result.title, result.url);
-    }
-  }
-
-  for (const img of data.images || []) {
-    if (typeof img === 'string') add(img, defaultCaption, '');
-  }
-
-  return images;
+function normalizeProfileImages(items, defaultCaption, limit = 6) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((item) => {
+      const url = typeof item === 'string' ? item : item?.url;
+      const normalized = normalizeImageUrl(url);
+      if (!normalized) return null;
+      return {
+        url: normalized,
+        caption: (typeof item === 'object' && item.caption) || defaultCaption || '',
+        sourceUrl: (typeof item === 'object' && item.sourceUrl) || '',
+      };
+    })
+    .filter(Boolean)
+    .slice(0, limit);
 }
 
-export async function searchArtistImages(person, tavilyApiKey) {
-  if (!tavilyApiKey) return [];
+function buildNativeSearchPrompt(person) {
+  return `You are building a profile page for the Craft Network — a graph of craftsmen, artists, and collaborators.
 
-  const query = `"${person.name}" ${person.role} ${person.location}`.trim();
-  try {
-    const data = await runTavilySearch(query, tavilyApiKey, {
-      advanced: true,
-      maxResults: 4,
-      includeImages: true,
-    });
-    return collectImagesFromSearch(data, person.name).slice(0, 3);
-  } catch (_) {
-    return [];
-  }
-}
-
-export async function searchArtworkImages(person, tavilyApiKey) {
-  if (!tavilyApiKey) return [];
-
-  const query = `"${person.name}" ${person.role} artwork craft`.trim();
-  try {
-    const data = await runTavilySearch(query, tavilyApiKey, {
-      advanced: true,
-      maxResults: 5,
-      includeImages: true,
-    });
-    return collectImagesFromSearch(data, `${person.name} — ${person.role}`).slice(0, 6);
-  } catch (_) {
-    return [];
-  }
-}
-
-function buildProfilePrompt(person, searchSources, searchAnswer = '') {
-  const sourceBlock = searchSources.length
-    ? searchSources
-        .map(
-          (s, i) =>
-            `[${i}] ${s.title}\n    URL: ${s.url}\n    Excerpt: ${s.snippet.slice(0, 400)}`,
-        )
-        .join('\n\n')
-    : '(No web sources found — write minimal copy and set needsMoreInfo true.)';
-
-  const answerBlock = searchAnswer
-    ? `\nSearch summary (cross-check against source excerpts):\n${searchAnswer}\n`
-    : '';
-
-  return `You write profile pages for the Craft Network — a graph of craftsmen, artists, and collaborators.
+Search the web for this person and verify you have the right individual before writing copy.
 
 Person (from NFC onboarding):
 - name: ${person.name || ''}
-- craft: ${person.role || ''}
-- location: ${person.location || ''}
+- craft: ${person.role || '(unknown)'}
+- location: ${person.location || '(unknown)'}
 - website provided by user: ${person.website || '(none)'}
 
-Web search results — ONLY use these for factual biographical claims:
-${sourceBlock}
-${answerBlock}
+Suggested searches: "${person.name}" ${person.role} ${person.location}; "${person.name}" artist craftsman ${person.location}.
 
-Respond with JSON only:
+After searching, respond with JSON only (no markdown fences):
 {
-  "usedSourceIndices": [0, 1],
-  "suggestedWebsite": "best official/personal site URL from sources, or empty string",
+  "usedSourceUrls": ["https://..."],
+  "suggestedWebsite": "official/personal site URL or empty string",
   "confidence": 0.0-1.0,
-  "matchSummary": "one sentence: do the sources clearly match this person?",
+  "matchSummary": "one sentence: do sources clearly match this person?",
   "tagline": "short line, max 12 words",
-  "bio": "1-2 short paragraphs grounded in sources; if no sources, say verification is needed",
+  "bio": "1-2 short paragraphs grounded in search results",
   "craftStatement": "one sentence about their craft",
-  "highlights": ["2-4 bullets supported by sources or provided fields"],
-  "needsMoreInfo": true or false
+  "highlights": ["2-4 bullets supported by sources"],
+  "needsMoreInfo": true or false,
+  "artistImages": [{"url":"https://...","caption":"","sourceUrl":""}],
+  "artworkImages": [{"url":"https://...","caption":"","sourceUrl":""}]
 }
 
 Rules:
+- usedSourceUrls must list every URL you relied on for factual claims
 - If sources do not clearly match this person, set needsMoreInfo true and confidence below 0.45
-- Do NOT invent awards, employers, exhibitions, or quotes not in sources
-- suggestedWebsite should be the artist's own site when visible in sources; avoid social media
-- usedSourceIndices lists which search result numbers you relied on`;
+- Do NOT invent awards, employers, exhibitions, or quotes not found in search
+- suggestedWebsite should be their own site when visible; avoid social media
+- artistImages: up to 3 portrait photos; artworkImages: up to 6 work samples with direct image URLs when found`;
 }
 
-async function callOpenAI(prompt, config) {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+function extractResponseText(data) {
+  for (const item of data.output || []) {
+    if (item.type !== 'message') continue;
+    for (const part of item.content || []) {
+      if (part.type === 'output_text' && part.text) return part.text;
+    }
+  }
+  return '';
+}
+
+function extractUrlCitations(data) {
+  const sources = [];
+  for (const item of data.output || []) {
+    if (item.type !== 'message') continue;
+    for (const part of item.content || []) {
+      for (const ann of part.annotations || []) {
+        if (ann.type === 'url_citation' && ann.url) {
+          sources.push({
+            title: ann.title || ann.url,
+            url: ann.url,
+            snippet: '',
+          });
+        }
+      }
+    }
+  }
+  return sources;
+}
+
+function extractWebSearchCallSources(data) {
+  const sources = [];
+  for (const item of data.output || []) {
+    if (item.type !== 'web_search_call') continue;
+    for (const src of item.action?.sources || []) {
+      if (src?.url) {
+        sources.push({
+          title: src.title || src.url,
+          url: src.url,
+          snippet: src.snippet || '',
+        });
+      }
+    }
+  }
+  return sources;
+}
+
+function webSearchWasPerformed(data) {
+  return (data.output || []).some((item) => item.type === 'web_search_call');
+}
+
+function mergeSearchSources(...groups) {
+  return dedupeSources(groups.flat());
+}
+
+function appendParsedSourceUrls(searchSources, parsed) {
+  const merged = [...searchSources];
+  const known = new Set(merged.map((s) => normalizeUrlKey(s.url)));
+
+  for (const url of parsed.usedSourceUrls || []) {
+    if (typeof url !== 'string' || !url.startsWith('http')) continue;
+    const key = normalizeUrlKey(url);
+    if (known.has(key)) continue;
+    known.add(key);
+    merged.push({ title: url, url, snippet: '' });
+  }
+
+  return merged;
+}
+
+function resolveCitedSources(parsed, searchSources) {
+  if (Array.isArray(parsed.usedSourceUrls) && parsed.usedSourceUrls.length) {
+    const wanted = new Set(parsed.usedSourceUrls.map(normalizeUrlKey));
+    return searchSources.filter((s) => wanted.has(normalizeUrlKey(s.url)));
+  }
+
+  const usedIndices = Array.isArray(parsed.usedSourceIndices)
+    ? parsed.usedSourceIndices.filter((i) => Number.isInteger(i) && searchSources[i])
+    : [];
+
+  return usedIndices.map((i) => searchSources[i]);
+}
+
+async function callOpenAIWithWebSearch(person, config) {
+  const model =
+    config.profileModel ||
+    config.model ||
+    process.env.OPENAI_PROFILE_MODEL ||
+    'gpt-4o-mini';
+
+  const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${config.apiKey}`,
     },
     body: JSON.stringify({
-      model: config.model || 'gpt-4o-mini',
-      temperature: 0.3,
-      response_format: { type: 'json_object' },
-      messages: [
+      model,
+      tools: [{ type: 'web_search' }],
+      tool_choice: 'required',
+      include: ['web_search_call.action.sources'],
+      input: [
         {
           role: 'system',
-          content: 'You are a careful craft-network curator. Cite only verified sources. Output JSON only.',
+          content:
+            'You are a careful craft-network curator. Search the web, cite real sources, and output JSON only.',
         },
-        { role: 'user', content: prompt },
+        {
+          role: 'user',
+          content: buildNativeSearchPrompt(person),
+        },
       ],
     }),
   });
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error?.message || `OpenAI request failed (${response.status})`);
+    throw new Error(err.error?.message || `OpenAI web search failed (${response.status})`);
   }
 
   const data = await response.json();
-  return data.choices?.[0]?.message?.content || '';
+  const rawText = extractResponseText(data);
+  if (!rawText) {
+    throw new Error('OpenAI web search returned no text output');
+  }
+
+  const parsed = parseProfileJson(rawText);
+  const searchSources = appendParsedSourceUrls(
+    mergeSearchSources(extractUrlCitations(data), extractWebSearchCallSources(data)),
+    parsed,
+  );
+
+  const searchStatus = searchSources.length
+    ? 'ok'
+    : webSearchWasPerformed(data)
+      ? 'no_results'
+      : 'search_skipped';
+
+  return { parsed, searchSources, searchStatus, searchPerformed: webSearchWasPerformed(data) };
 }
 
-export function normalizeProfile(parsed, person, searchSources = [], searchStatus = 'ok') {
+export function normalizeProfile(
+  parsed,
+  person,
+  searchSources = [],
+  searchStatus = 'ok',
+  searchPerformed = searchSources.length > 0,
+) {
   const fieldScore = scorePersonMatchConfidence(person);
-  const usedIndices = Array.isArray(parsed.usedSourceIndices)
-    ? parsed.usedSourceIndices.filter((i) => Number.isInteger(i) && searchSources[i])
-    : [];
+  const citedSources = resolveCitedSources(parsed, searchSources);
+  const citedKeys = new Set(citedSources.map((s) => normalizeUrlKey(s.url)));
 
-  const citedSources = usedIndices.length
-    ? usedIndices.map((i) => searchSources[i])
-    : [];
-
-  const allSources = searchSources.map((s, i) => ({
+  const allSources = searchSources.map((s) => ({
     title: s.title,
     url: s.url,
     snippet: s.snippet,
-    cited: usedIndices.includes(i),
+    cited: citedKeys.has(normalizeUrlKey(s.url)),
   }));
 
   let confidence = fieldScore;
@@ -367,7 +358,7 @@ export function normalizeProfile(parsed, person, searchSources = [], searchStatu
     confidence,
     matchSummary:
       searchStatus === 'missing_api_key'
-        ? 'Web search is not configured — set TAVILY_API_KEY on Render to look up artists like Google does.'
+        ? 'Web search is not configured — set OPENAI_API_KEY on the Render proxy.'
         : searchStatus === 'no_results'
           ? 'No matching public sources were found for this name and craft.'
           : parsed.matchSummary || '',
@@ -379,7 +370,7 @@ export function normalizeProfile(parsed, person, searchSources = [], searchStatu
     sources: allSources,
     citedSources: citedSources.map((s) => ({ title: s.title, url: s.url, snippet: s.snippet })),
     suggestedWebsite,
-    searchPerformed: searchSources.length > 0,
+    searchPerformed: Boolean(searchPerformed || searchSources.length > 0),
     searchStatus,
     artistImages: [],
     artworkImages: [],
@@ -390,11 +381,10 @@ function buildMissingSearchProfile(person) {
   return attachImagesToProfile(
     {
       confidence: 0.1,
-      matchSummary:
-        'Web search is not configured — set TAVILY_API_KEY on Render to look up artists like Google does.',
+      matchSummary: 'Web search is not configured — set OPENAI_API_KEY on the Render proxy.',
       tagline: '',
       bio:
-        'This profile could not be verified against the web. Add TAVILY_API_KEY to the Render proxy (craft-network-llm), then regenerate — or paste the artist\'s website manually below.',
+        'This profile could not be verified against the web. Configure OPENAI_API_KEY on Render (craft-network-llm), then regenerate — or paste the artist\'s website manually.',
       craftStatement: person.role ? `${person.name} works in ${person.role}.` : '',
       highlights: [],
       needsMoreInfo: true,
@@ -429,22 +419,27 @@ export async function enrichPersonProfile(person, llmConfig) {
     throw new Error('Name is required to generate a profile');
   }
 
-  const searchResult = await searchWebSources(trimmed, llmConfig.tavilyApiKey);
-  const { sources: searchSources, status: searchStatus, answer: searchAnswer } = searchResult;
-
-  if (searchStatus === 'missing_api_key') {
+  if (!llmConfig?.apiKey) {
     return buildMissingSearchProfile(trimmed);
   }
 
-  const [artistImages, artworkImages] = await Promise.all([
-    searchArtistImages(trimmed, llmConfig.tavilyApiKey).catch(() => []),
-    searchArtworkImages(trimmed, llmConfig.tavilyApiKey).catch(() => []),
-  ]);
+  const { parsed, searchSources, searchStatus, searchPerformed } =
+    await callOpenAIWithWebSearch(trimmed, llmConfig);
 
-  const raw = await callOpenAI(
-    buildProfilePrompt(trimmed, searchSources, searchAnswer),
-    llmConfig,
+  const profile = normalizeProfile(
+    parsed,
+    trimmed,
+    searchSources,
+    searchStatus,
+    searchPerformed,
   );
-  const profile = normalizeProfile(parseProfileJson(raw), trimmed, searchSources, searchStatus);
+
+  const artistImages = normalizeProfileImages(parsed.artistImages, trimmed.name, 3);
+  const artworkImages = normalizeProfileImages(
+    parsed.artworkImages,
+    `${trimmed.name} — ${trimmed.role}`,
+    6,
+  );
+
   return attachImagesToProfile(profile, artistImages, artworkImages);
 }

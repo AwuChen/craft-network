@@ -25,7 +25,8 @@
     "sync-roster": "node scripts/sync-craft-network-data.js",
     "export-3d-graph": "node scripts/export-3d-graph.js",
     "neo4j-keepalive": "node scripts/neo4j-keepalive.js",
-    "enrich-profiles": "node scripts/enrich-profiles.mjs"
+    "enrich-profiles": "node scripts/enrich-profiles.mjs",
+    "compare-profiles": "node scripts/compare-profiles.mjs"
   },
   "eslintConfig": {
     "extends": "react-app"

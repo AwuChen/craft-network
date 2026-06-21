@@ -98,9 +98,8 @@ export default function ProfileReviewModal({
                 </ul>
               ) : draft.searchStatus === 'missing_api_key' ? (
                 <p className="profile-config-warning">
-                  Web search is not enabled on the server. Add <strong>TAVILY_API_KEY</strong> in Render
-                  (craft-network-llm → Environment), redeploy, then regenerate. Without it, profiles cannot
-                  match a Google search.
+                  Web search is not enabled on the server. Add <strong>OPENAI_API_KEY</strong> in Render
+                  (craft-network-llm → Environment), redeploy, then regenerate.
                 </p>
               ) : (
                 <p className="profile-needs-info">
