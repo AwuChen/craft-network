@@ -91,5 +91,6 @@ jobs:
             exit 0
           fi
           git commit -m "Keep Neo4j keep-alive schedule active."
+          git stash push -u -m "ci-temp" || true
           git pull --rebase origin "${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"
