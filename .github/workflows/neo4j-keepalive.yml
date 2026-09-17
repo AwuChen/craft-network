@@ -2,9 +2,21 @@ name: Neo4j Keep-Alive
 
 on:
   schedule:
-    # Every 30 minutes — prevents Aura Free from pausing due to inactivity
-    - cron: '*/30 * * * *'
+    # Aura Free pauses after ~72 hours idle. GitHub cron can delay, so ping often enough.
+    - cron: '0 */6 * * *'
   workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/neo4j-keepalive.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: neo4j-keepalive
+  cancel-in-progress: false
 
 jobs:
   ping:
@@ -41,3 +53,35 @@ jobs:
           name: graph-data
           path: react-graph-viz/public/graph-data.json
           if-no-files-found: error
+
+      - name: Record weekly activity so GitHub keeps this schedule enabled
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          stamp=".github/neo4j-keepalive.stamp"
+          mkdir -p .github
+          now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          should_commit=0
+          if [ ! -f "$stamp" ]; then
+            should_commit=1
+          else
+            age_days=$(( ( $(date -u +%s) - $(stat -c %Y "$stamp") ) / 86400 ))
+            if [ "$age_days" -ge 7 ]; then
+              should_commit=1
+            fi
+          fi
+          if [ "$should_commit" -eq 0 ]; then
+            echo "Stamp is recent; skipping commit"
+            exit 0
+          fi
+          printf 'lastPing=%s\n' "$now" > "$stamp"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$stamp"
+          if git diff --cached --quiet; then
+            echo "No stamp change"
+            exit 0
+          fi
+          git commit -m "Keep Neo4j keep-alive schedule active."
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
